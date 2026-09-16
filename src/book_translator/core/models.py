@@ -54,6 +54,10 @@ class Segment:
     def is_translated(self) -> bool:
         return bool(self.translated_text and self.status != SegmentStatus.PENDING)
 
+    @property
+    def segment_type(self) -> str:
+        return str(self.metadata.get("segment_type", "paragraph"))
+
 
 @dataclass
 class Entity:
