@@ -1,4 +1,4 @@
-"""Geração determinística de IDs estáveis para as unidades estruturais do livro."""
+"""Geração determinística de IDs estáveis para todas as unidades estruturais do livro."""
 
 from __future__ import annotations
 
@@ -8,11 +8,7 @@ import unicodedata
 
 
 def slugify(text: str) -> str:
-    """Converte um texto em slug alfanumérico seguro para diretórios e identificadores.
-
-    Remove acentos, converte para minúsculas e substitui caracteres não-alfanuméricos
-    por underscores.
-    """
+    """Converte um texto em slug alfanumérico seguro para diretórios e identificadores."""
     normalized = unicodedata.normalize("NFKD", text)
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^\w\s-]", "", ascii_text).strip().lower()
@@ -54,3 +50,28 @@ def generate_paragraph_id(chapter_id: str, order_index: int) -> str:
 def generate_segment_id(chapter_id: str, order_index: int) -> str:
     """Gera identificador estável e permanente de segmento (ex: ch_0001_seg_00001)."""
     return f"{chapter_id}_seg_{order_index:05d}"
+
+
+def generate_heading_id(chapter_id: str, order_index: int) -> str:
+    """Gera identificador canônico de heading/título (ex: ch_0001_h_0001)."""
+    return f"{chapter_id}_h_{order_index:04d}"
+
+
+def generate_dialogue_id(chapter_id: str, order_index: int) -> str:
+    """Gera identificador canônico de bloco de diálogo (ex: ch_0001_diag_0001)."""
+    return f"{chapter_id}_diag_{order_index:04d}"
+
+
+def generate_footnote_id(chapter_id: str, order_index: int) -> str:
+    """Gera identificador canônico de nota de rodapé (ex: ch_0001_fn_0001)."""
+    return f"{chapter_id}_fn_{order_index:04d}"
+
+
+def generate_reference_id(order_index: int) -> str:
+    """Gera identificador canônico de referência bibliográfica (ex: ref_0001)."""
+    return f"ref_{order_index:04d}"
+
+
+def generate_image_id(chapter_id: str, order_index: int) -> str:
+    """Gera identificador canônico de placeholder de imagem (ex: ch_0001_img_0001)."""
+    return f"{chapter_id}_img_{order_index:04d}"

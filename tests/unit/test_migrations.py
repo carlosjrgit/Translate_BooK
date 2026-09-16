@@ -33,7 +33,8 @@ def test_apply_migrations_and_idempotency(tmp_path: Path) -> None:
     applied = apply_migrations(conn)
     assert 1 in applied
     assert 2 in applied
-    assert get_current_schema_version(conn) == 2
+    assert 3 in applied
+    assert get_current_schema_version(conn) == 3
 
     # Verifica se as tabelas foram criadas
     cur = conn.cursor()
@@ -43,6 +44,11 @@ def test_apply_migrations_and_idempotency(tmp_path: Path) -> None:
     assert "documents" in tables
     assert "chapters" in tables
     assert "segments" in tables
+    assert "headings" in tables
+    assert "dialogues" in tables
+    assert "footnotes" in tables
+    assert "references_bibliography" in tables
+    assert "images" in tables
     assert "characters" in tables
     assert "glossary" in tables
     assert "translation_memory" in tables
@@ -54,7 +60,7 @@ def test_apply_migrations_and_idempotency(tmp_path: Path) -> None:
     # Segunda chamada: nenhuma nova migration deve ser executada
     reapplied = apply_migrations(conn)
     assert reapplied == []
-    assert get_applied_versions(conn) == {1, 2}
+    assert get_applied_versions(conn) == {1, 2, 3}
 
     conn.close()
 

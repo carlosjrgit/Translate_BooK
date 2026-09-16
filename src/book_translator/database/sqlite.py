@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -10,15 +11,23 @@ from book_translator.context.base import TranslationContext
 from book_translator.core.models import (
     Chapter,
     Checkpoint,
+    DialogueBlock,
     Document,
+    DocumentMetadata,
     Entity,
     EventLog,
+    Footnote,
+    FormattingSpan,
+    Heading,
+    ImagePlaceholder,
     Paragraph,
     Project,
     ProjectMetadata,
+    Reference,
     Section,
     Segment,
     SegmentStatus,
+    SourceLocation,
 )
 from book_translator.database.base import DatabaseInterface
 from book_translator.database.connection import get_sqlite_connection, transaction, wal_checkpoint
@@ -109,6 +118,11 @@ class SQLiteDatabase(DatabaseInterface):
             cur.close()
 
     def save_document(self, document: Document, project_id: str) -> None:
+        meta_dict = (
+            asdict(document.metadata)
+            if hasattr(document, "metadata") and isinstance(document.metadata, DocumentMetadata)
+            else (document.metadata if isinstance(document.metadata, dict) else {})
+        )
         with transaction(self.conn) as cur:
             cur.execute(
                 """
@@ -127,7 +141,280 @@ class SQLiteDatabase(DatabaseInterface):
                     document.title,
                     document.author,
                     document.source_format,
-                    json.dumps(document.metadata),
+                    json.dumps(meta_dict),
+                ),
+            )
+
+            # Salva cada capítulo e suas unidades ordenadas
+            for chapter in document.chapters:
+                self._save_chapter_internal(cur, chapter, document.id)
+
+            # Salva referências bibliográficas
+            for ref in document.references:
+                cur.execute(
+                    """
+                    INSERT INTO references_bibliography (
+                        id, document_id, citation_key, raw_text, normalized_text,
+                        url, reading_order, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        citation_key=excluded.citation_key,
+                        raw_text=excluded.raw_text,
+                        normalized_text=excluded.normalized_text,
+                        url=excluded.url,
+                        reading_order=excluded.reading_order,
+                        metadata_json=excluded.metadata_json;
+                    """,
+                    (
+                        ref.id,
+                        document.id,
+                        ref.citation_key,
+                        ref.raw_text,
+                        ref.normalized_text,
+                        ref.url,
+                        ref.reading_order,
+                        json.dumps(ref.metadata),
+                    ),
+                )
+
+    def _save_chapter_internal(
+        self,
+        cur: Any,
+        chapter: Chapter,
+        document_id: str,
+    ) -> None:
+        cur.execute(
+            """
+            INSERT INTO chapters (id, document_id, title, order_index, metadata_json)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title=excluded.title,
+                order_index=excluded.order_index,
+                metadata_json=excluded.metadata_json;
+            """,
+            (
+                chapter.id,
+                document_id,
+                chapter.title,
+                chapter.order,
+                json.dumps(chapter.metadata),
+            ),
+        )
+
+        for sec in chapter.sections:
+            cur.execute(
+                """
+                INSERT INTO sections (
+                    id, chapter_id, parent_section_id, title, order_index, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title=excluded.title,
+                    order_index=excluded.order_index,
+                    parent_section_id=excluded.parent_section_id,
+                    metadata_json=excluded.metadata_json;
+                """,
+                (
+                    sec.id,
+                    sec.chapter_id,
+                    sec.parent_section_id,
+                    sec.title,
+                    getattr(sec, "order_index", getattr(sec, "reading_order", 0)),
+                    json.dumps(sec.metadata),
+                ),
+            )
+
+        for p in chapter.paragraphs:
+            spans_json = json.dumps([asdict(s) for s in getattr(p, "spans", [])])
+            loc = getattr(p, "source_location", None)
+            loc_json = json.dumps(asdict(loc)) if loc else "{}"
+            cur.execute(
+                """
+                INSERT INTO paragraphs (
+                    id, chapter_id, section_id, order_index, raw_text,
+                    normalized_text, reading_order, spans_json, source_location_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    section_id=excluded.section_id,
+                    order_index=excluded.order_index,
+                    raw_text=excluded.raw_text,
+                    normalized_text=excluded.normalized_text,
+                    reading_order=excluded.reading_order,
+                    spans_json=excluded.spans_json,
+                    source_location_json=excluded.source_location_json,
+                    metadata_json=excluded.metadata_json;
+                """,
+                (
+                    p.id,
+                    p.chapter_id,
+                    p.section_id,
+                    getattr(p, "order_index", getattr(p, "reading_order", 0)),
+                    p.raw_text,
+                    getattr(p, "normalized_text", p.raw_text),
+                    getattr(p, "reading_order", 0),
+                    spans_json,
+                    loc_json,
+                    json.dumps(p.metadata),
+                ),
+            )
+
+        for h in chapter.headings:
+            spans_json = json.dumps([asdict(s) for s in h.spans])
+            loc_json = (
+                json.dumps(asdict(h.source_location)) if h.source_location else "{}"
+            )
+            cur.execute(
+                """
+                INSERT INTO headings (
+                    id, chapter_id, level, raw_text, normalized_text,
+                    reading_order, spans_json, source_location_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    level=excluded.level,
+                    raw_text=excluded.raw_text,
+                    normalized_text=excluded.normalized_text,
+                    reading_order=excluded.reading_order,
+                    spans_json=excluded.spans_json,
+                    source_location_json=excluded.source_location_json,
+                    metadata_json=excluded.metadata_json;
+                """,
+                (
+                    h.id,
+                    h.chapter_id,
+                    h.level,
+                    h.raw_text,
+                    h.normalized_text,
+                    h.reading_order,
+                    spans_json,
+                    loc_json,
+                    json.dumps(h.metadata),
+                ),
+            )
+
+        for d in chapter.dialogue_blocks:
+            spans_json = json.dumps([asdict(s) for s in d.spans])
+            loc_json = (
+                json.dumps(asdict(d.source_location)) if d.source_location else "{}"
+            )
+            cur.execute(
+                """
+                INSERT INTO dialogues (
+                    id, chapter_id, dialogue_marker, speaker_hint, raw_text,
+                    normalized_text, reading_order, spans_json, source_location_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    dialogue_marker=excluded.dialogue_marker,
+                    speaker_hint=excluded.speaker_hint,
+                    raw_text=excluded.raw_text,
+                    normalized_text=excluded.normalized_text,
+                    reading_order=excluded.reading_order,
+                    spans_json=excluded.spans_json,
+                    source_location_json=excluded.source_location_json,
+                    metadata_json=excluded.metadata_json;
+                """,
+                (
+                    d.id,
+                    d.chapter_id,
+                    d.dialogue_marker,
+                    d.speaker_hint,
+                    d.raw_text,
+                    d.normalized_text,
+                    d.reading_order,
+                    spans_json,
+                    loc_json,
+                    json.dumps(d.metadata),
+                ),
+            )
+
+        for fn in chapter.footnotes:
+            loc_json = (
+                json.dumps(asdict(fn.source_location)) if fn.source_location else "{}"
+            )
+            cur.execute(
+                """
+                INSERT INTO footnotes (
+                    id, chapter_id, marker, raw_text, normalized_text,
+                    referencing_unit_id, reading_order, source_location_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    marker=excluded.marker,
+                    raw_text=excluded.raw_text,
+                    normalized_text=excluded.normalized_text,
+                    referencing_unit_id=excluded.referencing_unit_id,
+                    reading_order=excluded.reading_order,
+                    source_location_json=excluded.source_location_json,
+                    metadata_json=excluded.metadata_json;
+                """,
+                (
+                    fn.id,
+                    fn.chapter_id,
+                    fn.marker,
+                    fn.raw_text,
+                    fn.normalized_text,
+                    fn.referencing_unit_id,
+                    fn.reading_order,
+                    loc_json,
+                    json.dumps(fn.metadata),
+                ),
+            )
+
+        for img in chapter.image_placeholders:
+            loc_json = (
+                json.dumps(asdict(img.source_location)) if img.source_location else "{}"
+            )
+            cur.execute(
+                """
+                INSERT INTO images (
+                    id, chapter_id, caption_raw, caption_normalized, alt_text,
+                    relative_path, original_src, reading_order, source_location_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    caption_raw=excluded.caption_raw,
+                    caption_normalized=excluded.caption_normalized,
+                    alt_text=excluded.alt_text,
+                    relative_path=excluded.relative_path,
+                    original_src=excluded.original_src,
+                    reading_order=excluded.reading_order,
+                    source_location_json=excluded.source_location_json,
+                    metadata_json=excluded.metadata_json;
+                """,
+                (
+                    img.id,
+                    img.chapter_id,
+                    img.caption_raw,
+                    img.caption_normalized,
+                    img.alt_text,
+                    img.relative_path,
+                    img.original_src,
+                    img.reading_order,
+                    loc_json,
+                    json.dumps(img.metadata),
+                ),
+            )
+
+        for seg in chapter.segments:
+            cur.execute(
+                """
+                INSERT INTO segments (
+                    id, chapter_id, paragraph_id, section_id, order_index,
+                    original_text, translated_text, status, original_hash, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    translated_text=excluded.translated_text,
+                    status=excluded.status,
+                    metadata_json=excluded.metadata_json,
+                    updated_at=CURRENT_TIMESTAMP;
+                """,
+                (
+                    seg.id,
+                    seg.chapter_id,
+                    seg.paragraph_id,
+                    seg.section_id,
+                    seg.sequence_order,
+                    seg.original_text,
+                    seg.translated_text,
+                    seg.status.value,
+                    seg.original_hash,
+                    json.dumps(seg.metadata),
                 ),
             )
 
@@ -140,31 +427,201 @@ class SQLiteDatabase(DatabaseInterface):
                 return None
 
             doc_id = row["id"]
-            doc = Document(
-                id=doc_id,
-                title=row["title"],
-                author=row["author"],
-                source_format=row["source_format"],
-                metadata=json.loads(row["metadata_json"] or "{}"),
+            meta_raw = json.loads(row["metadata_json"] or "{}")
+            metadata = DocumentMetadata(
+                title=meta_raw.get("title", row["title"]),
+                author=meta_raw.get("author", row["author"]),
+                language=meta_raw.get("language", "en"),
+                publisher=meta_raw.get("publisher", ""),
+                publication_date=meta_raw.get("publication_date", ""),
+                isbn=meta_raw.get("isbn", ""),
+                source_format=meta_raw.get("source_format", row["source_format"]),
+                source_file_path=meta_raw.get("source_file_path", ""),
+                source_file_sha256=meta_raw.get("source_file_sha256", ""),
+                extra=meta_raw.get("extra", {}),
             )
+
+            def parse_spans(raw_json: str | None) -> list[FormattingSpan]:
+                return [FormattingSpan(**s) for s in json.loads(raw_json or "[]")]
+
+            def parse_loc(raw_json: str | None) -> SourceLocation | None:
+                d = json.loads(raw_json or "{}")
+                return SourceLocation(**d) if d else None
 
             # Carrega capítulos
             cur.execute(
                 "SELECT * FROM chapters WHERE document_id = ? ORDER BY order_index ASC;",
                 (doc_id,),
             )
+            chapters: list[Chapter] = []
             for ch_row in cur.fetchall():
                 ch_id = ch_row["id"]
+                ch_order = ch_row["order_index"]
+                ch_meta = json.loads(ch_row["metadata_json"] or "{}")
+
+                # Seções
+                cur.execute(
+                    "SELECT * FROM sections WHERE chapter_id = ? ORDER BY order_index ASC;",
+                    (ch_id,),
+                )
+                sections = [
+                    Section(
+                        id=s["id"],
+                        chapter_id=s["chapter_id"],
+                        title=s["title"],
+                        order_index=s["order_index"],
+                        reading_order=s["order_index"],
+                        parent_section_id=s["parent_section_id"],
+                        metadata=json.loads(s["metadata_json"] or "{}"),
+                    )
+                    for s in cur.fetchall()
+                ]
+
+                # Parágrafos
+                cur.execute(
+                    "SELECT * FROM paragraphs WHERE chapter_id = ? ORDER BY order_index ASC;",
+                    (ch_id,),
+                )
+                paragraphs = [
+                    Paragraph(
+                        id=p["id"],
+                        chapter_id=p["chapter_id"],
+                        reading_order=p["reading_order"] or p["order_index"],
+                        raw_text=p["raw_text"],
+                        normalized_text=p["normalized_text"] or p["raw_text"],
+                        section_id=p["section_id"],
+                        spans=parse_spans(p["spans_json"]),
+                        source_location=parse_loc(p["source_location_json"]),
+                        metadata=json.loads(p["metadata_json"] or "{}"),
+                    )
+                    for p in cur.fetchall()
+                ]
+
+                # Headings
+                cur.execute(
+                    "SELECT * FROM headings WHERE chapter_id = ? ORDER BY reading_order ASC;",
+                    (ch_id,),
+                )
+                headings = [
+                    Heading(
+                        id=h["id"],
+                        chapter_id=h["chapter_id"],
+                        level=h["level"],
+                        raw_text=h["raw_text"],
+                        normalized_text=h["normalized_text"],
+                        reading_order=h["reading_order"],
+                        spans=parse_spans(h["spans_json"]),
+                        source_location=parse_loc(h["source_location_json"]),
+                        metadata=json.loads(h["metadata_json"] or "{}"),
+                    )
+                    for h in cur.fetchall()
+                ]
+
+                # Diálogos
+                cur.execute(
+                    "SELECT * FROM dialogues WHERE chapter_id = ? ORDER BY reading_order ASC;",
+                    (ch_id,),
+                )
+                dialogues = [
+                    DialogueBlock(
+                        id=d["id"],
+                        chapter_id=d["chapter_id"],
+                        dialogue_marker=d["dialogue_marker"],
+                        speaker_hint=d["speaker_hint"],
+                        raw_text=d["raw_text"],
+                        normalized_text=d["normalized_text"],
+                        reading_order=d["reading_order"],
+                        spans=parse_spans(d["spans_json"]),
+                        source_location=parse_loc(d["source_location_json"]),
+                        metadata=json.loads(d["metadata_json"] or "{}"),
+                    )
+                    for d in cur.fetchall()
+                ]
+
+                # Footnotes
+                cur.execute(
+                    "SELECT * FROM footnotes WHERE chapter_id = ? ORDER BY reading_order ASC;",
+                    (ch_id,),
+                )
+                footnotes = [
+                    Footnote(
+                        id=fn["id"],
+                        chapter_id=fn["chapter_id"],
+                        marker=fn["marker"],
+                        raw_text=fn["raw_text"],
+                        normalized_text=fn["normalized_text"],
+                        referencing_unit_id=fn["referencing_unit_id"],
+                        reading_order=fn["reading_order"],
+                        source_location=parse_loc(fn["source_location_json"]),
+                        metadata=json.loads(fn["metadata_json"] or "{}"),
+                    )
+                    for fn in cur.fetchall()
+                ]
+
+                # Images
+                cur.execute(
+                    "SELECT * FROM images WHERE chapter_id = ? ORDER BY reading_order ASC;",
+                    (ch_id,),
+                )
+                images = [
+                    ImagePlaceholder(
+                        id=img["id"],
+                        chapter_id=img["chapter_id"],
+                        caption_raw=img["caption_raw"],
+                        caption_normalized=img["caption_normalized"],
+                        alt_text=img["alt_text"],
+                        relative_path=img["relative_path"],
+                        original_src=img["original_src"],
+                        reading_order=img["reading_order"],
+                        source_location=parse_loc(img["source_location_json"]),
+                        metadata=json.loads(img["metadata_json"] or "{}"),
+                    )
+                    for img in cur.fetchall()
+                ]
+
                 chapter = Chapter(
                     id=ch_id,
                     title=ch_row["title"],
-                    order=ch_row["order_index"],
-                    metadata=json.loads(ch_row["metadata_json"] or "{}"),
+                    order=ch_order,
+                    reading_order=ch_order,
+                    headings=headings,
+                    paragraphs=paragraphs,
+                    dialogue_blocks=dialogues,
+                    image_placeholders=images,
+                    footnotes=footnotes,
+                    sections=sections,
+                    segments=self.get_segments_by_chapter(ch_id),
+                    metadata=ch_meta,
                 )
-                chapter.segments = self.get_segments_by_chapter(ch_id)
-                doc.chapters.append(chapter)
+                chapters.append(chapter)
 
-            return doc
+            # Referências
+            cur.execute(
+                """
+                SELECT * FROM references_bibliography
+                WHERE document_id = ? ORDER BY reading_order ASC;
+                """,
+                (doc_id,),
+            )
+            references = [
+                Reference(
+                    id=ref_row["id"],
+                    citation_key=ref_row["citation_key"],
+                    raw_text=ref_row["raw_text"],
+                    normalized_text=ref_row["normalized_text"],
+                    url=ref_row["url"],
+                    reading_order=ref_row["reading_order"],
+                    metadata=json.loads(ref_row["metadata_json"] or "{}"),
+                )
+                for ref_row in cur.fetchall()
+            ]
+
+            return Document(
+                id=doc_id,
+                metadata=metadata,
+                chapters=chapters,
+                references=references,
+            )
         finally:
             cur.close()
 
@@ -173,23 +630,7 @@ class SQLiteDatabase(DatabaseInterface):
     # -------------------------------------------------------------------------
     def save_chapter(self, chapter: Chapter, document_id: str) -> None:
         with transaction(self.conn) as cur:
-            cur.execute(
-                """
-                INSERT INTO chapters (id, document_id, title, order_index, metadata_json)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    title=excluded.title,
-                    order_index=excluded.order_index,
-                    metadata_json=excluded.metadata_json;
-                """,
-                (
-                    chapter.id,
-                    document_id,
-                    chapter.title,
-                    chapter.order,
-                    json.dumps(chapter.metadata),
-                ),
-            )
+            self._save_chapter_internal(cur, chapter, document_id)
 
     def save_section(self, section: Section) -> None:
         with transaction(self.conn) as cur:

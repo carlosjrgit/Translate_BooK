@@ -1,18 +1,28 @@
-"""Módulo central com modelos de domínio e contratos canônicos."""
+"""Módulo central com modelos de domínio, contratos e representação documental."""
 
 from __future__ import annotations
 
 from book_translator.core.contracts import Identifiable, Serializable
-from book_translator.core.models import (
+from book_translator.core.document import (
     Chapter,
-    Checkpoint,
+    DialogueBlock,
     Document,
+    DocumentMetadata,
+    Footnote,
+    FormattingSpan,
+    Heading,
+    ImagePlaceholder,
+    Paragraph,
+    Reference,
+    Section,
+    SourceLocation,
+)
+from book_translator.core.models import (
+    Checkpoint,
     Entity,
     EventLog,
-    Paragraph,
     Project,
     ProjectMetadata,
-    Section,
     Segment,
     SegmentStatus,
 )
@@ -20,12 +30,20 @@ from book_translator.core.models import (
 __all__ = [
     "Identifiable",
     "Serializable",
-    "SegmentStatus",
-    "Section",
+    "SourceLocation",
+    "FormattingSpan",
+    "Heading",
     "Paragraph",
-    "Segment",
+    "DialogueBlock",
+    "Footnote",
+    "Reference",
+    "ImagePlaceholder",
+    "Section",
     "Chapter",
+    "DocumentMetadata",
     "Document",
+    "SegmentStatus",
+    "Segment",
     "Entity",
     "Checkpoint",
     "EventLog",
