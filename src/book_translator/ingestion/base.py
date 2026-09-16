@@ -17,6 +17,7 @@ class IngestionInspection:
     has_text_layer: bool = True
     requires_ocr: bool = False
     estimated_pages_or_chapters: int = 0
+    pdf_classification: str | None = None
 
 
 @runtime_checkable

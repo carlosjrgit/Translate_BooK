@@ -29,6 +29,12 @@ class ParsingError(BookTranslatorError):
     """Lançado quando um parser falha ao processar o formato do documento."""
 
 
+class NeedsOcrError(ParsingError):
+    """Lançado quando o documento (ex: PDF escaneado) não possui texto
+    utilizável e necessita de OCR.
+    """
+
+
 class AnalysisError(BookTranslatorError):
     """Lançado durante a fase de análise global da obra."""
 

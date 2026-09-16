@@ -79,6 +79,10 @@ class IngestionInspector(IngestionInspectorInterface):
             elif ext == ".epub":
                 return "epub"
 
+        # Validação específica de PDF
+        if header.startswith(b"%PDF-") or ext == ".pdf":
+            return "pdf"
+
         # Validação específica de HTML
         header_lower = header.lower()
         if (
@@ -121,11 +125,47 @@ class IngestionInspector(IngestionInspectorInterface):
             f"Tamanho: {file_size} bytes"
         )
 
+        has_text_layer = True
+        requires_ocr = False
+        est_units = 1
+        pdf_classification: str | None = None
+
+        if format_detected == "pdf":
+            try:
+                import pypdf
+
+                with path.open("rb") as f:
+                    reader = pypdf.PdfReader(f)
+                    est_units = len(reader.pages)
+                    text_pages = 0
+                    for page in reader.pages:
+                        txt = page.extract_text() or ""
+                        if len(txt.strip()) >= 40:
+                            text_pages += 1
+
+                    if est_units == 0 or text_pages == 0:
+                        pdf_classification = "SCANNED_NEEDS_OCR"
+                        has_text_layer = False
+                        requires_ocr = True
+                    elif text_pages == est_units:
+                        pdf_classification = "TEXTUAL"
+                        has_text_layer = True
+                        requires_ocr = False
+                    else:
+                        pdf_classification = "MIXED"
+                        has_text_layer = True
+                        requires_ocr = True
+            except Exception as e:
+                logger.warning(
+                    f"Falha ao inspecionar páginas do PDF '{path.name}': {e}"
+                )
+
         return IngestionInspection(
             file_path=path,
             detected_format=format_detected,
             file_size_bytes=file_size,
-            has_text_layer=True,
-            requires_ocr=False,
-            estimated_pages_or_chapters=1,
+            has_text_layer=has_text_layer,
+            requires_ocr=requires_ocr,
+            estimated_pages_or_chapters=est_units,
+            pdf_classification=pdf_classification,
         )

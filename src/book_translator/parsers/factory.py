@@ -13,6 +13,7 @@ from book_translator.parsers.docx import DocxParser
 from book_translator.parsers.epub import EpubParser
 from book_translator.parsers.html import HtmlParser
 from book_translator.parsers.markdown import MarkdownParser
+from book_translator.parsers.pdf import PdfParser
 from book_translator.parsers.txt import TxtParser
 
 logger = get_logger("parsers.factory")
@@ -31,6 +32,8 @@ def get_parser_for_format(fmt: str) -> ParserInterface:
         return DocxParser()
     if norm_fmt == "epub":
         return EpubParser()
+    if norm_fmt == "pdf":
+        return PdfParser()
 
     raise IngestionError(f"Não há parser registrado para o formato '{fmt}'.")
 
