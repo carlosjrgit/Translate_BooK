@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from book_translator.parsers.base import BaseParser, ParserInterface
 from book_translator.parsers.docx import DocxParser
+from book_translator.parsers.epub import EpubParser
 from book_translator.parsers.factory import (
     get_parser_for_file,
     get_parser_for_format,
@@ -21,6 +22,7 @@ __all__ = [
     "MarkdownParser",
     "HtmlParser",
     "DocxParser",
+    "EpubParser",
     "get_parser_for_file",
     "get_parser_for_format",
     "parse_document",

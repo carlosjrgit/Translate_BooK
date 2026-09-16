@@ -63,6 +63,22 @@ class IngestionInspector(IngestionInspectorInterface):
             elif ext == ".docx":
                 return "docx"
 
+        # Validação específica de EPUB (arquivo ZIP contendo META-INF/container.xml)
+        if header.startswith(b"PK\x03\x04") or ext == ".epub":
+            if zipfile.is_zipfile(path):
+                try:
+                    with zipfile.ZipFile(path, "r") as zf:
+                        nl = zf.namelist()
+                        if "META-INF/container.xml" in nl:
+                            return "epub"
+                        if "mimetype" in nl and b"application/epub+zip" in zf.read("mimetype"):
+                            return "epub"
+                except Exception:
+                    if ext == ".epub":
+                        return "epub"
+            elif ext == ".epub":
+                return "epub"
+
         # Validação específica de HTML
         header_lower = header.lower()
         if (
