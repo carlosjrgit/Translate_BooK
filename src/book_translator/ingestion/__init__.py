@@ -6,5 +6,6 @@ from book_translator.ingestion.base import (
     IngestionInspection,
     IngestionInspectorInterface,
 )
+from book_translator.ingestion.inspector import IngestionInspector
 
-__all__ = ["IngestionInspection", "IngestionInspectorInterface"]
+__all__ = ["IngestionInspection", "IngestionInspectorInterface", "IngestionInspector"]

@@ -32,9 +32,15 @@ def generate_document_id(project_id: str) -> str:
     return f"doc_{project_id}"
 
 
-def generate_chapter_id(order_index: int) -> str:
+def generate_chapter_id(
+    order_index_or_prefix: int | str,
+    order_index: int | None = None,
+) -> str:
     """Gera identificador canônico de capítulo ordenado (ex: ch_0001)."""
-    return f"ch_{order_index:04d}"
+    idx = order_index if order_index is not None else order_index_or_prefix
+    if isinstance(idx, int):
+        return f"ch_{idx:04d}"
+    return "ch_0001"
 
 
 def generate_section_id(chapter_id: str, order_index: int) -> str:
