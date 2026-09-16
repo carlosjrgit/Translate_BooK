@@ -1,0 +1,489 @@
+Projeto: Tradutor Inteligente de Livros e Documentos EN → PT-BR
+
+1. Visão geral
+
+O projeto consiste no desenvolvimento, em Python, de um aplicativo capaz de receber livros e documentos em inglês, analisar profundamente seu conteúdo, construir uma representação estruturada da obra e produzir uma tradução para Português Brasileiro (PT-BR) com foco em:
+
+- fidelidade ao significado original;
+- naturalidade do português;
+- preservação do contexto;
+- consistência entre capítulos;
+- manutenção dos nomes, termos e relações;
+- preservação da voz dos personagens;
+- coerência estilística;
+- identificação automática de possíveis erros de tradução;
+- revisão do livro após a tradução completa.
+
+O objetivo não é simplesmente criar uma interface que envia parágrafos para um modelo de tradução.
+
+O programa deverá funcionar como um sistema editorial de tradução, utilizando um modelo especializado como motor linguístico e uma série de camadas próprias de análise, memória, contexto, validação e revisão.
+
+A arquitetura inicial será baseada em:
+
+Python + MADLAD-400-10B-MT
+
+O processamento deverá ocorrer localmente na máquina do usuário.
+
+Não haverá dependência do Ollama.
+
+
+2. Princípio central da arquitetura
+
+A separação mais importante do projeto será:
+
+MADLAD = motor de tradução
+Nosso programa = cérebro editorial
+
+O MADLAD-400-10B-MT não deve ser tratado como um LLM conversacional responsável por entender sozinho todo o livro.
+
+Ele será utilizado principalmente para aquilo em que é especializado:
+tradução entre idiomas.
+
+As demais capacidades serão construídas ao redor dele pelo próprio aplicativo.
+
+A arquitetura conceitual será:
+
+ARQUIVO ORIGINAL
+       │
+       ▼
+INGESTÃO E EXTRAÇÃO
+       │
+       ▼
+ANÁLISE GLOBAL DA OBRA
+       │
+       ▼
+BANCO DE CONHECIMENTO DO LIVRO
+       │
+       ▼
+CONSTRUÇÃO DE CONTEXTO
+       │
+       ▼
+MADLAD-400-10B-MT
+       │
+       ▼
+TRADUÇÃO INICIAL
+       │
+       ▼
+VALIDAÇÃO + REVISÃO
+       │
+       ▼
+AUDITORIA GLOBAL
+       │
+       ▼
+DOCUMENTO FINAL EM PT-BR
+
+
+3. Formatos de entrada
+
+O programa deverá ser projetado para aceitar os formatos textuais mais comuns.
+
+Inicialmente:
+- PDF
+- EPUB
+- DOCX
+- TXT
+- Markdown
+- HTML
+
+Posteriormente poderão ser adicionados outros formatos.
+
+O formato original deverá ser convertido internamente para uma estrutura intermediária padronizada.
+
+Exemplo:
+
+Document
+ ├── metadata
+ ├── chapters
+ │    ├── chapter_001
+ │    │    ├── paragraphs
+ │    │    ├── headings
+ │    │    └── notes
+ │    └── ...
+ ├── footnotes
+ ├── images
+ └── references
+
+A tradução não deverá trabalhar diretamente sobre PDF, DOCX ou EPUB.
+Primeiro o documento será interpretado e transformado em uma representação interna.
+
+
+4. Tratamento específico de PDF
+
+PDF exige cuidado especial.
+Existem dois cenários.
+
+- PDF com camada textual:
+O programa deverá extrair diretamente:
+texto, parágrafos, páginas, títulos, notas, ordem de leitura.
+Sempre que possível, a extração textual deverá ser preferida.
+
+- PDF escaneado:
+Se o arquivo for essencialmente composto por imagens, será necessária uma etapa de OCR.
+O programa deverá detectar automaticamente essa situação.
+
+Fluxo:
+PDF
+ ↓
+Existe texto utilizável?
+SIM → extração normal
+NÃO → OCR → texto
+
+OCR deverá ser tratado como mecanismo de recuperação e não como primeira opção, pois introduz erros adicionais que podem contaminar posteriormente a tradução.
+
+
+5. Pré-processamento
+
+Antes de qualquer tradução, o conteúdo deverá passar por uma etapa de limpeza e normalização.
+Essa etapa poderá:
+- remover cabeçalhos repetidos
+- remover rodapés
+- corrigir hifenização de final de linha
+- reconstruir parágrafos
+- detectar títulos
+- detectar capítulos
+- detectar notas
+- preservar itálico/negrito quando relevante
+- identificar diálogos
+- preservar quebras estruturais
+- normalizar caracteres Unicode
+
+Nenhuma tradução será iniciada antes que a estrutura do documento esteja razoavelmente reconstruída.
+
+
+6. Análise global da obra
+
+O programa não deverá começar imediatamente pelo primeiro parágrafo.
+Primeiro será executada uma análise da obra.
+O sistema deverá tentar identificar:
+- capítulos
+- seções
+- personagens
+- locais
+- organizações
+- nomes próprios
+- termos recorrentes
+- relações entre personagens
+- cronologia
+- formas de tratamento
+- expressões recorrentes
+- conceitos específicos da obra
+- estilo narrativo
+- registro de linguagem
+- estrutura dos diálogos
+
+O objetivo é construir um banco de conhecimento que acompanhará toda a tradução.
+
+
+7. Banco de conhecimento da obra
+
+Cada livro deverá possuir seu próprio banco de dados.
+Uma implementação inicial poderá usar:
+SQLite + JSON para algumas estruturas auxiliares.
+
+O banco ficará associado exclusivamente ao projeto daquele livro.
+Exemplo:
+projects/
+   the_book/
+      project.db
+      source/
+      cache/
+      translations/
+      output/
+
+Esse banco será a memória persistente do sistema.
+Mesmo que o programa seja fechado no meio da tradução, todo o conhecimento já adquirido continuará disponível.
+
+
+8. Character Memory
+
+A Character Memory armazenará informações conhecidas sobre cada personagem.
+Exemplo:
+ID: character_0042
+Nome: Margaret Henderson
+Aliases: Margaret, Mrs. Henderson, Maggie
+Sexo/gênero gramatical relevante: feminino
+Relações: mãe de Jack, ex-esposa de Robert
+Registro de fala: formal moderado
+Características linguísticas: sarcasmo frequente
+Primeira aparição: capítulo 2
+Ocorrências: 137
+
+O objetivo não é apenas fornecer essas informações ao modelo.
+A Character Memory será utilizada pelo sistema para interpretar:
+pronomes, relações, formas de tratamento, referências indiretas, apelidos, continuidade narrativa.
+
+
+9. Translation Memory
+
+A Translation Memory armazenará traduções previamente estabelecidas.
+Exemplo:
+SOURCE: The Royal Guard
+TARGET: Guarda Real
+TYPE: organization
+STATUS: locked
+
+Se o termo aparecer novamente cinquenta capítulos depois, o sistema deverá saber que já existe uma tradução definida.
+Isso evita:
+The Royal Guard
+Capítulo 3: Guarda Real
+Capítulo 20: Guarda do Reino
+Capítulo 41: Guarda Real Real
+
+O sistema deverá detectar automaticamente esses conflitos.
+A Translation Memory poderá armazenar também frases recorrentes e construções estabelecidas.
+
+
+10. Glossary
+
+O glossário será diferente da Translation Memory.
+Ele representará conceitos importantes da obra.
+Cada entrada poderá conter:
+source_term, target_term, tipo, descrição, aliases, case_sensitive, locked, gender, plural, context, first_occurrence, occurrences, notes.
+
+Exemplo:
+Source: The Watch
+Target: A Patrulha
+Type: organization
+Locked: true
+Aliases: Watch, Night Watch
+Context: organização militar responsável pela fronteira
+
+O glossário terá prioridade elevada durante verificações de consistência.
+
+
+11. Context Retrieval
+
+O sistema não deverá enviar capítulos inteiros indiscriminadamente para o tradutor.
+Antes de cada trecho, o Context Retrieval deverá decidir:
+qual contexto é relevante para traduzir este trecho?
+
+Poderá recuperar:
+- parágrafos imediatamente anteriores
+- parágrafos posteriores
+- resumo do capítulo
+- trechos anteriores relacionados
+- personagens presentes na cena
+- informações sobre relações
+- termos do glossário
+- traduções já estabelecidas
+
+O objetivo é fornecer apenas contexto útil.
+Isso evita contexto insuficiente e contexto gigantesco e irrelevante.
+
+
+12. Style Bible
+
+Cada livro deverá possuir uma espécie de manual editorial interno.
+A Style Bible poderá armazenar:
+tipo de narrador, tempo verbal predominante, nível de formalidade, estilo dos diálogos, pontuação, tratamento de palavrões, uso de você/tu/senhor/senhora, forma de representar pensamentos, tratamento de títulos, tratamento de nomes próprios, registro predominante.
+
+Exemplo:
+Narrador: terceira pessoa
+Registro: literário contemporâneo
+Diálogo: natural em PT-BR
+Profanidade: preservar intensidade do original
+Forma de tratamento predominante: você
+Pontuação: padrão editorial brasileiro
+
+Uma ressalva importante:
+MADLAD não deverá ser tratado como um modelo conversacional que simplesmente recebe toda a Style Bible em um prompt e obedece.
+A Style Bible será principalmente utilizada pelas camadas de:
+seleção, validação, comparação, consistência, revisão.
+
+
+13. Segmentação da tradução
+
+O livro será dividido em unidades de tradução semanticamente coerentes.
+Não queremos cada sentença isolada, nem livro inteiro de uma vez.
+A unidade poderá ser formada por:
+parágrafo, grupo de parágrafos, bloco de diálogo, pequena cena dependendo da estrutura encontrada.
+Isso será ajustado empiricamente.
+
+Cada unidade terá um identificador permanente.
+Exemplo:
+chapter_004, segment_0087
+
+Isso permitirá rastrear:
+original, tradução, revisões, erros, contexto utilizado, versões anteriores.
+
+
+14. Motor de tradução
+
+O modelo inicial será:
+MADLAD-400-10B-MT
+Direção principal: English → Português Brasileiro.
+
+O MADLAD deverá permanecer desacoplado do restante da aplicação.
+O código não deverá assumir que ele será o modelo utilizado para sempre.
+Arquitetura:
+TranslationEngine → MADLADAdapter (e futuros modelos).
+
+
+15. Quantização do MADLAD
+
+Não pretendemos distribuir os aproximadamente 42 GB dos pesos FP32 originais.
+O modelo ficará fora do executável e fora do Git.
+Serão testadas versões quantizadas: Q4 (~6 GB), Q6 (~8–9 GB), Q8 (~11 GB).
+A preferência inicial será estudar Q6 como possível padrão, mas a decisão final dependerá de benchmarks reais.
+
+
+16. O modelo NÃO ficará no GitHub
+
+O repositório conterá código-fonte, documentação, testes, configurações, scripts e recursos de interface.
+Não conterá .gguf, .safetensors nem modelos gigantes (deverão constar no .gitignore).
+O usuário poderá baixar o modelo pela aplicação ou apontar para um modelo já existente.
+
+
+17. Model Manager
+
+O aplicativo deverá possuir um gerenciador próprio de modelos para baixar, pausar, retomar, verificar checksum, detectar corrupção, remover, alterar diretório e selecionar modelo.
+
+
+18. Runtime de inferência
+
+A decisão definitiva ainda NÃO foi tomada.
+As principais possibilidades a serem estudadas são:
+CTranslate2 ou runtime GGUF compatível (incluindo llama.cpp).
+A escolha será baseada em benchmark real (qualidade, velocidade, CPU, RAM, VRAM, NVIDIA, AMD, CPU-only, estabilidade no Windows).
+
+
+19. Geração de múltiplos candidatos
+
+Quando tecnicamente adequado, o MADLAD poderá produzir múltiplas hipóteses de tradução (N-best) avaliadas por um Candidate Ranker opcional.
+
+
+20. Semantic QA
+
+Depois da tradução, será executado controle de qualidade semântico para verificar:
+omissões, informações adicionadas, negações invertidas, mudanças de datas/números/relações/nomes próprios, alteração de intensidade emocional e tradução literal indevida de expressões idiomáticas.
+
+
+21. Verificações determinísticas
+
+Além de IA, o sistema utilizará checagens por código estrito:
+números, datas, percentuais, valores monetários, medidas, nomes, URLs, citações, notas, negações, referências e termos bloqueados.
+
+
+22. Backtranslation
+
+English original → Português → English reconstruído → Comparação com original.
+Utilizado como evidência auxiliar para detectar omissões e distorções, nunca como autoridade final isolada.
+
+
+23. Consistency Pass
+
+Auditoria global após o livro inteiro estar traduzido:
+personagens, nomes, pronomes, tratamentos, locais, organizações, terminologia, títulos, cronologia, estilo, diálogos, glossário e Translation Memory.
+
+
+24. Correção automática versus alerta
+
+Três categorias de ocorrências:
+- SAFE FIX: correção determinística segura (ex: erro tipográfico óbvio em nome próprio).
+- SUGGESTED FIX: correção provável.
+- REVIEW REQUIRED: decisão editorial ambígua (ex: possível perda de ironia).
+
+
+25. Fluxo completo
+
+Pipeline conceitual:
+Input → Parser → Normalização → Estrutura → Análise da Obra → Memórias (Characters, Glossary, Translation Memory, Style Bible, Story Memory) → Context Retrieval → Segment Builder → MADLAD Engine (com N-best opcional e Candidate Ranker) → Translation Draft → QA (Semantic QA, Backtranslation, Structural QA) → Correções Locais → Revisão de Capítulos → Consistency Pass Global → Texto Final PT-BR → Exportação.
+
+
+26. Tradução incremental
+
+Cada segmento concluído será persistido imediatamente (SQLite/cache), permitindo pausar, fechar e retomar sem perda de processamento.
+
+
+27. Cache
+
+Segmentos traduzidos com mesmo original, modelo, configurações e glossário serão reaproveitados do cache.
+
+
+28. Hardware
+
+Detecção automática de CPU, RAM, GPU, VRAM, SO e espaço em disco, com perfis reais mensuráveis (Economy, Balanced, Quality).
+
+
+29. Processamento CPU/GPU
+
+Suporte tanto a GPU (NVIDIA, AMD) quanto a CPU-only.
+
+
+30. Interface gráfica
+
+Focada no usuário comum: fluxo simples (Selecionar arquivo → Detectar idioma → Analisar → Mostrar resumo → Selecionar qualidade → Traduzir → Revisar → Exportar), com opções técnicas avançadas disponíveis.
+
+
+31. Feedback durante processamento
+
+Indicadores claros de capítulo, segmento (ex: 1483 / 3921), porcentagem, tempo decorrido, erros e atividade em tempo real.
+
+
+32. Exportação
+
+Formatos prioritários de saída: TXT, DOCX, EPUB. Preservar ao máximo a estrutura original (especialmente em EPUB).
+
+
+33. Não modificar o original
+
+O arquivo original nunca deverá ser sobrescrito (ex: book.epub gera book_pt-BR.epub).
+
+
+34. Privacidade
+
+Toda a tradução ocorre 100% localmente por padrão. Nenhum dado é enviado para APIs externas de terceiros.
+
+
+35. Distribuição
+
+Código aberto no GitHub. Usuários técnicos: git clone. Usuários comuns: instalador/executável via GitHub Releases.
+
+
+36. Estrutura sugerida do repositório
+
+src/ (ingestion, parsers, analysis, translation, memory, context, qa, consistency, models, export, database, ui, utils)
+tests/
+benchmarks/
+docs/
+resources/
+scripts/
+requirements/
+
+
+37. Benchmark obrigatório
+
+Validação empírica rigorosa de Q4 vs Q6 vs Q8 em diversos gêneros textuais (prosa, ficção, técnica, diálogos, humor, etc.).
+
+
+38. Limitações fundamentais
+
+O sistema não promete equivalência automática a um grande tradutor literário humano para poesia, trocadilhos, dialetos, ironia sutil e adaptação cultural profunda.
+
+
+39. Filosofia do projeto
+
+"Modelo competente + contexto correto + memória persistente + regras + validação + auditoria."
+
+
+40. Arquitetura inicial oficialmente definida
+
+Python + MADLAD-400-10B-MT + Character Memory + Translation Memory + Glossary + Context Retrieval + Style Bible + Semantic QA + Backtranslation + Consistency Pass.
+
+
+41. Decisões que ainda permanecem abertas
+
+- Runtime (CTranslate2 vs llama.cpp/GGUF)
+- Quantização padrão (Q4 / Q6 / Q8)
+- Modelo de embeddings para Semantic QA
+- Estratégia de detecção de personagens e biblioteca de NER
+- Algoritmo de Context Retrieval
+- Tamanho ideal de segmentos e N-best
+- Motor de OCR
+- Framework da interface gráfica
+- Esquema relacional exato do banco
+
+
+42. Objetivo final
+
+Um sistema editorial completo que transforma book.epub (ou outro formato) em book_pt-BR.epub com consistência, qualidade e fidelidade através de uma pipeline automatizada.
