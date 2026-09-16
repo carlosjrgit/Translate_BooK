@@ -273,11 +273,7 @@ class PdfParser(BaseParser):
                     line.lower().strip() for line in lines[:top_limit] if line.strip()
                 }
                 bottom_candidates = (
-                    {
-                        line.lower().strip()
-                        for line in lines[num_l - bottom_limit :]
-                        if line.strip()
-                    }
+                    {line.lower().strip() for line in lines[num_l - bottom_limit :] if line.strip()}
                     if bottom_limit > 0
                     else set()
                 )
@@ -288,12 +284,8 @@ class PdfParser(BaseParser):
                     footer_page_counts[f] = footer_page_counts.get(f, 0) + 1
 
             threshold = max(2, int(total_pages * self.config.header_footer_frequency_threshold))
-            recurring_headers = {
-                h for h, count in header_page_counts.items() if count >= threshold
-            }
-            recurring_footers = {
-                f for f, count in footer_page_counts.items() if count >= threshold
-            }
+            recurring_headers = {h for h, count in header_page_counts.items() if count >= threshold}
+            recurring_footers = {f for f, count in footer_page_counts.items() if count >= threshold}
 
         # 2. Filtragem de cada página
         cleaned_pages: list[list[str]] = []
@@ -402,9 +394,7 @@ class PdfParser(BaseParser):
                 if not para_text:
                     return
 
-                p_id = generate_paragraph_id(
-                    curr_chapter.id, len(curr_chapter.paragraphs) + 1
-                )
+                p_id = generate_paragraph_id(curr_chapter.id, len(curr_chapter.paragraphs) + 1)
                 curr_chapter.paragraphs.append(
                     Paragraph(
                         id=p_id,
@@ -433,11 +423,7 @@ class PdfParser(BaseParser):
                 if self.config.detect_headings:
                     if CHAPTER_HEADING_REGEX.match(line_str):
                         is_ch_heading = True
-                    elif (
-                        len(line_str) < 50
-                        and line_str.isupper()
-                        and len(line_str.split()) <= 6
-                    ):
+                    elif len(line_str) < 50 and line_str.isupper() and len(line_str.split()) <= 6:
                         is_ch_heading = True
 
                 if is_ch_heading:
@@ -461,9 +447,7 @@ class PdfParser(BaseParser):
                     else:
                         curr_chapter.title = line_str
 
-                    h_id = generate_heading_id(
-                        curr_chapter.id, len(curr_chapter.headings) + 1
-                    )
+                    h_id = generate_heading_id(curr_chapter.id, len(curr_chapter.headings) + 1)
                     curr_chapter.headings.append(
                         Heading(
                             id=h_id,
@@ -514,11 +498,7 @@ class PdfParser(BaseParser):
 
             flush_paragraph()
 
-        if (
-            curr_chapter.paragraphs
-            or curr_chapter.headings
-            or curr_chapter.dialogue_blocks
-        ):
+        if curr_chapter.paragraphs or curr_chapter.headings or curr_chapter.dialogue_blocks:
             chapters.append(curr_chapter)
 
         return chapters

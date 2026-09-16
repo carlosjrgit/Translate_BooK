@@ -109,7 +109,8 @@ def test_textual_pdf_extraction_and_structure(tmp_path: Path) -> None:
 
 
 def test_scanned_pdf_detection_and_rejection(tmp_path: Path) -> None:
-    """Verifica que PDFs sem camada textual utilizável são classificados como SCANNED e rejeitados.
+    """Verifica que PDFs sem camada textual são classificados como SCANNED
+    e rejeitados pelo parser.
     """
     # 3 páginas em branco simulando PDF escaneado sem texto
     pdf_bytes = _create_synthetic_pdf(["", "", ""])
@@ -163,9 +164,7 @@ def test_mixed_pdf_classification(tmp_path: Path) -> None:
 def test_dehyphenation_heuristic(tmp_path: Path) -> None:
     """Verifica a heurística de desifenização no final de linha."""
     p_text = (
-        "This is an extraor-\n"
-        "dinary inter-\n"
-        "national translation platform with robust parsing."
+        "This is an extraor-\ndinary inter-\nnational translation platform with robust parsing."
     )
     pdf_bytes = _create_synthetic_pdf([p_text])
     pdf_file = tmp_path / "hyphen_test.pdf"
@@ -217,9 +216,7 @@ def test_headers_footers_and_page_numbers_heuristics(tmp_path: Path) -> None:
         config=PdfParserConfig(remove_headers_footers=False, remove_page_numbers=False)
     )
     doc_raw = parser_disabled.parse(pdf_file)
-    all_raw_texts = [
-        u.normalized_text for c in doc_raw.chapters for u in c.paragraphs + c.headings
-    ]
+    all_raw_texts = [u.normalized_text for c in doc_raw.chapters for u in c.paragraphs + c.headings]
     assert any("TRANSLATE BOOK SYSTEM" in t for t in all_raw_texts)
 
 
@@ -255,6 +252,7 @@ def test_corrupted_pdf_handling(tmp_path: Path) -> None:
     with pytest.raises(ParsingError) as exc_info:
         parser.parse(corrupted_file)
 
-    assert "corrompido" in str(exc_info.value).lower() or "stream inválido" in str(
-        exc_info.value
-    ).lower()
+    assert (
+        "corrompido" in str(exc_info.value).lower()
+        or "stream inválido" in str(exc_info.value).lower()
+    )

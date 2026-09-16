@@ -9,15 +9,21 @@ import pytest
 from book_translator.core.models import (
     Chapter,
     Checkpoint,
+    DialogueBlock,
     Document,
     Entity,
     EventLog,
+    Footnote,
+    FormattingSpan,
+    Heading,
+    ImagePlaceholder,
     Paragraph,
     Project,
     ProjectMetadata,
     Section,
     Segment,
     SegmentStatus,
+    SourceLocation,
 )
 from book_translator.database.connection import transaction
 from book_translator.database.sqlite import SQLiteDatabase
@@ -284,3 +290,127 @@ def test_transaction_rollback_on_error(db: SQLiteDatabase) -> None:
     cur.execute("SELECT * FROM projects WHERE id = 'p1';")
     assert cur.fetchone() is None
     cur.close()
+
+
+def test_end_to_end_parsed_document_sqlite_roundtrip(db: SQLiteDatabase, tmp_path: Path) -> None:
+    """Verifica persistência e reconstituição completa de documento com elementos ricos."""
+    proj_meta = ProjectMetadata(
+        project_id="roundtrip_prj",
+        book_title="Full Document Roundtrip",
+        source_file_path=str(tmp_path / "book.txt"),
+    )
+    db.save_project(Project(metadata=proj_meta, project_dir=tmp_path, db_path=db.db_path))
+
+    doc = Document(
+        id="doc_roundtrip",
+        title="Full Document Roundtrip",
+        author="Arthur Conan Doyle",
+        source_format="txt",
+    )
+    ch = Chapter(id="ch_rt_01", title="Chapter I: The Arrival", order=1)
+
+    h = Heading(
+        id="h_rt_01",
+        chapter_id="ch_rt_01",
+        level=1,
+        raw_text="Chapter I: The Arrival",
+        normalized_text="Chapter I: The Arrival",
+        reading_order=1,
+        source_location=SourceLocation(file_path="book.txt", line_number=1),
+    )
+
+    p = Paragraph(
+        id="p_rt_01",
+        chapter_id="ch_rt_01",
+        reading_order=2,
+        raw_text="It was a dark and stormy night.",
+        normalized_text="It was a dark and stormy night.",
+        spans=[FormattingSpan(start=0, end=2, style="bold")],
+        source_location=SourceLocation(file_path="book.txt", line_number=3),
+    )
+
+    d = DialogueBlock(
+        id="d_rt_01",
+        chapter_id="ch_rt_01",
+        dialogue_marker="—",
+        speaker_hint="Holmes",
+        reading_order=3,
+        raw_text="— Watson, look outside!",
+        normalized_text="— Watson, look outside!",
+        spans=[FormattingSpan(start=2, end=8, style="italic")],
+        source_location=SourceLocation(file_path="book.txt", line_number=5),
+    )
+
+    fn = Footnote(
+        id="fn_rt_01",
+        chapter_id="ch_rt_01",
+        marker="[1]",
+        raw_text="[1] A historical reference.",
+        normalized_text="[1] A historical reference.",
+        referencing_unit_id="p_rt_01",
+        reading_order=4,
+        source_location=SourceLocation(file_path="book.txt", line_number=7),
+    )
+
+    img = ImagePlaceholder(
+        id="img_rt_01",
+        chapter_id="ch_rt_01",
+        caption_raw="Figure 1: The manor in the rain.",
+        caption_normalized="Figure 1: The manor in the rain.",
+        alt_text="Rainy manor",
+        relative_path="images/fig1.png",
+        reading_order=5,
+        source_location=SourceLocation(file_path="book.txt", line_number=9),
+    )
+
+    ch.headings.append(h)
+    ch.paragraphs.append(p)
+    ch.dialogue_blocks.append(d)
+    ch.footnotes.append(fn)
+    ch.image_placeholders.append(img)
+    doc.chapters.append(ch)
+
+    # Persiste o documento completo
+    db.save_document(doc, project_id="roundtrip_prj")
+
+    # Carrega o documento do banco
+    loaded_doc = db.load_document("roundtrip_prj")
+    assert loaded_doc is not None
+    assert loaded_doc.id == "doc_roundtrip"
+    assert loaded_doc.title == "Full Document Roundtrip"
+    assert loaded_doc.author == "Arthur Conan Doyle"
+    assert len(loaded_doc.chapters) == 1
+
+    loaded_ch = loaded_doc.chapters[0]
+    assert loaded_ch.id == "ch_rt_01"
+    assert loaded_ch.title == "Chapter I: The Arrival"
+
+    # Valida Heading
+    assert len(loaded_ch.headings) == 1
+    assert loaded_ch.headings[0].id == "h_rt_01"
+    assert loaded_ch.headings[0].level == 1
+    assert loaded_ch.headings[0].source_location.line_number == 1
+
+    # Valida Paragraph e Spans
+    assert len(loaded_ch.paragraphs) == 1
+    assert loaded_ch.paragraphs[0].id == "p_rt_01"
+    assert len(loaded_ch.paragraphs[0].spans) == 1
+    assert loaded_ch.paragraphs[0].spans[0].style == "bold"
+    assert loaded_ch.paragraphs[0].source_location.line_number == 3
+
+    # Valida DialogueBlock e Spans
+    assert len(loaded_ch.dialogue_blocks) == 1
+    assert loaded_ch.dialogue_blocks[0].dialogue_marker == "—"
+    assert loaded_ch.dialogue_blocks[0].speaker_hint == "Holmes"
+    assert loaded_ch.dialogue_blocks[0].spans[0].style == "italic"
+
+    # Valida Footnote
+    assert len(loaded_ch.footnotes) == 1
+    assert loaded_ch.footnotes[0].marker == "[1]"
+    assert loaded_ch.footnotes[0].referencing_unit_id == "p_rt_01"
+
+    # Valida ImagePlaceholder
+    assert len(loaded_ch.image_placeholders) == 1
+    assert loaded_ch.image_placeholders[0].caption_raw == "Figure 1: The manor in the rain."
+    assert loaded_ch.image_placeholders[0].relative_path == "images/fig1.png"
+    assert loaded_ch.image_placeholders[0].source_location.line_number == 9

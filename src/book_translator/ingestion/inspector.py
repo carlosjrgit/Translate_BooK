@@ -33,9 +33,7 @@ class IngestionInspector(IngestionInspectorInterface):
         if not path.exists():
             raise IngestionError(f"Arquivo de entrada não encontrado: {path}")
         if path.is_dir():
-            raise IngestionError(
-                f"O caminho informado é um diretório, não um arquivo: {path}"
-            )
+            raise IngestionError(f"O caminho informado é um diretório, não um arquivo: {path}")
 
         # 1. Detecção inicial por extensão
         ext = path.suffix.lower()
@@ -98,9 +96,7 @@ class IngestionInspector(IngestionInspectorInterface):
 
         # Se tem extensão não suportada (ex: .xyz, .bin), rejeita
         if ext and ext not in SUPPORTED_EXTENSIONS_MAP:
-            raise IngestionError(
-                f"Formato ou extensão não suportada para o arquivo: '{path.name}'"
-            )
+            raise IngestionError(f"Formato ou extensão não suportada para o arquivo: '{path.name}'")
 
         # Fallback se não tiver extensão conhecida mas for texto plano sem bytes nulos
         if b"\x00" not in header:
@@ -156,9 +152,7 @@ class IngestionInspector(IngestionInspectorInterface):
                         has_text_layer = True
                         requires_ocr = True
             except Exception as e:
-                logger.warning(
-                    f"Falha ao inspecionar páginas do PDF '{path.name}': {e}"
-                )
+                logger.warning(f"Falha ao inspecionar páginas do PDF '{path.name}': {e}")
 
         return IngestionInspection(
             file_path=path,

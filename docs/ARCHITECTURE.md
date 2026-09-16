@@ -103,9 +103,19 @@ O objetivo deste projeto é fornecer uma esteira editorial automatizada que rece
 - **`contracts.py`**: Definição dos protocolos formais tipados (`Protocol`) que desacoplam os módulos.
 
 ### 3.2 `ingestion` & `parsers`
-- **`ingestion`**: Roteia o arquivo para o analisador correto. No caso de PDFs, avalia se existe camada de texto utilizável ou se há necessidade de OCR (*fallback*).
-- **`parsers`**: Converte formatos heterogêneos (PDF, EPUB, DOCX, TXT, MD, HTML) para a árvore canônica `Document`.
-- **`normalization`**: Executa des-hifenização de quebra de linha, normalização Unicode, detecção de cabeçalhos/rodapés repetidos e recomposição de parágrafos e diálogos.
+- **`IngestionInspector`**: Realiza triagem e inspeção prévia sem carregar o arquivo inteiro na memória:
+  - Detecção de formato por combinação de extensão insensível a maiúsculas/minúsculas e inspeção de magic bytes (`PK` para DOCX/EPUB, `%PDF-` para PDF, tags para HTML).
+  - Triagem de qualidade em PDFs: classifica o documento como `TEXTUAL` (100% de páginas com texto útil), `MIXED` (páginas mistas texto/imagem) ou `SCANNED_NEEDS_OCR` (rejeitado precocemente com `NeedsOcrError`).
+  - Salvaguarda de segurança: verificação de caminhos (`Path.resolve`), rejeição de diretórios como arquivos e limite configurável de tamanho de arquivo (`max_file_size_bytes`).
+  - **Imutabilidade Absoluta**: Leitura estritamente em modo `rb`; o arquivo de entrada original nunca é modificado ou sobrescrito.
+- **Parsers Implementados**:
+  - `TxtParser`: Suporte a UTF-8, detecção automática de encoding via `chardet` (com fallbacks para latin-1/windows-1252), remoção de UTF-8 BOM, segmentação de capítulos baseada em regex e classificação de diálogos.
+  - `MarkdownParser`: Tokenização estrutural em AST via `markdown-it-py`, mapeamento de níveis de heading, spans inline (negrito, itálico, código, links) e notas de rodapé (`[^1]`).
+  - `HtmlParser`: Parsing semântico via `BeautifulSoup` (parser `lxml`), extração de headings (`h1` a `h6`), parágrafos, spans de formatação (`b`, `i`, `em`, `strong`, `code`, `a`), tratamento de ruby/sup/sub e extração de imagens.
+  - `DocxParser`: Processamento XML nativo de `word/document.xml` e `word/footnotes.xml`, mapeamento de estilos de parágrafo, extração de runs tipográficos e extração de notas de rodapé com IDs de referência.
+  - `EpubParser`: Leitura de arquivos `.epub` (EPUB2 e EPUB3), navegação pelo manifesto OPF e `spine` para ordem estrita de leitura, descarte de itens de navegação repetidos (TOC/nav) para evitar duplicação textual e retenção de metadados de empacotamento para reconstrução futura.
+  - `PdfParser`: Extração textual via `pypdf`, recomposição de palavras quebradas por hifenização de fim de linha (`extraor-` + `dinary`), eliminação estatística de cabeçalhos e rodapés recorrentes por limite de frequência e supressão de numeração de páginas isolada.
+- **`normalization`**: Executa normalização Unicode canônica (NFKC), normalização de espaços em branco, padronização de aspas/hífens editoriais e classificação de blocos de diálogo via marcadores canônicos (`—`, `–`, `"`, `«`).
 
 ### 3.3 `analysis`
 - Varre a obra integralmente antes do início da tradução.
@@ -139,7 +149,16 @@ O objetivo deste projeto é fornecer uma esteira editorial automatizada que rece
 - Identifica divergências acumuladas ao longo dos capítulos (ex: "The Iron Guard" traduzido de formas diferentes em capítulos espaçados).
 
 ### 3.9 `database`
-- Gerencia o banco persistente por obra (`projects/<livro>/project.db`), suportando tradução incremental com checkpointing a cada segmento (pausa, retomada e recuperação contra falhas).
+- Gerencia o banco relacional SQLite local por obra (`projects/<livro>/project.db`).
+- **Características e Robustez**:
+  - Modo WAL (`PRAGMA journal_mode=WAL`) para concorrência de leitura e escrita.
+  - Integridade referencial ativada (`PRAGMA foreign_keys = ON`).
+  - Timeout de concorrência (`busy_timeout = 5000ms`) e gerenciador de contexto transacional seguro (`transaction()`) com rollback automático em caso de exceção.
+- **Sistema de Migrations Versionadas**:
+  - `v0001_initial_schema.sql`: Tabelas fundamentais de projetos, documentos, capítulos, seções, parágrafos, segmentos, entidades, personagens, glossário, memórias de tradução, bíblia de estilo, traduções, revisões, QA, eventos e checkpoints.
+  - `v0002_add_indices.sql`: Índices de performance para busca por `project_id`, `chapter_id`, `reading_order` e termos de busca.
+  - `v0003_rich_document_units.sql`: Tabelas e colunas para unidades editoriais ricas (`headings`, `dialogues`, `footnotes`, `images`, `references_bibliography`, `spans_json` e `source_location_json`).
+- Suporta tradução incremental com checkpointing a cada segmento (pausa, retomada e recuperação contra falhas).
 
 ### 3.10 `export`
 - Reconstrói o documento no formato de destino desejado (EPUB, DOCX, TXT), preservando formatação (itálicos, títulos, quebras, notas de rodapé).

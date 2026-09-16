@@ -201,13 +201,15 @@ class EpubParser(BaseParser):
                 doc.metadata.isbn = doc_isbn
 
                 # Salva metadados de empacotamento para futura reconstrução do EPUB traduzido
-                doc.metadata.extra.update({
-                    "epub_version": epub_version,
-                    "opf_path": opf_path,
-                    "spine": spine_itemrefs,
-                    "manifest": manifest,
-                    "nav_item_ids": list(nav_item_ids),
-                })
+                doc.metadata.extra.update(
+                    {
+                        "epub_version": epub_version,
+                        "opf_path": opf_path,
+                        "spine": spine_itemrefs,
+                        "manifest": manifest,
+                        "nav_item_ids": list(nav_item_ids),
+                    }
+                )
 
                 # 3. Processamento dos documentos XHTML na sequência da Spine
                 chapters: list[Chapter] = []

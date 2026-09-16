@@ -68,10 +68,7 @@ def test_txt_parser_latin1_encoding(tmp_path: Path) -> None:
 
 
 def test_txt_parser_utf8_bom(tmp_path: Path) -> None:
-    sample_content = (
-        "CHAPTER 1\n\n"
-        "Sample text with UTF-8 BOM prefix.\n"
-    )
+    sample_content = "CHAPTER 1\n\nSample text with UTF-8 BOM prefix.\n"
     txt_file = tmp_path / "bom_book.txt"
     txt_file.write_bytes(b"\xef\xbb\xbf" + sample_content.encode("utf-8"))
 

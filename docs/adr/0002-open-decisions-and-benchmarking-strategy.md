@@ -37,9 +37,10 @@ A especificação conceitual do projeto estabelece explicitamente que certas esc
 - **Status**: **OPEN**
 
 ### 7. Mecanismo de OCR para PDFs Escaneados
-- **Opções em estudo**: Tesseract / EasyOCR / PDF-Extractors especializados.
+- **Situação Atual**: A triagem e detecção precoce de PDFs escaneados foi implementada com sucesso no Prompt 06 (`IngestionInspector` e `PdfParser`). Documentos sem camada textual ou escaneados são classificados como `SCANNED_NEEDS_OCR` e rejeitados com `NeedsOcrError`, protegendo a esteira de ruído.
+- **Opções em estudo para a etapa de OCR**: Tesseract / EasyOCR / PDF-Extractors especializados com OCR integrado.
 - **Critérios de decisão**: Taxa de erro em caracteres acentuados, preservação da ordem de leitura e impacto no tamanho do instalador final.
-- **Status**: **OPEN**
+- **Status**: **OPEN** (Decisão do motor de OCR mantida aberta para a fase dedicada de OCR).
 
 ## Próximos Passos
 Cada uma dessas decisões será formalmente fechada em sua respectiva etapa de desenvolvimento, acompanhada de relatórios de benchmark técnicos e reprodutíveis.

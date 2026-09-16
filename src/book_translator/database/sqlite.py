@@ -259,9 +259,7 @@ class SQLiteDatabase(DatabaseInterface):
 
         for h in chapter.headings:
             spans_json = json.dumps([asdict(s) for s in h.spans])
-            loc_json = (
-                json.dumps(asdict(h.source_location)) if h.source_location else "{}"
-            )
+            loc_json = json.dumps(asdict(h.source_location)) if h.source_location else "{}"
             cur.execute(
                 """
                 INSERT INTO headings (
@@ -292,9 +290,7 @@ class SQLiteDatabase(DatabaseInterface):
 
         for d in chapter.dialogue_blocks:
             spans_json = json.dumps([asdict(s) for s in d.spans])
-            loc_json = (
-                json.dumps(asdict(d.source_location)) if d.source_location else "{}"
-            )
+            loc_json = json.dumps(asdict(d.source_location)) if d.source_location else "{}"
             cur.execute(
                 """
                 INSERT INTO dialogues (
@@ -326,9 +322,7 @@ class SQLiteDatabase(DatabaseInterface):
             )
 
         for fn in chapter.footnotes:
-            loc_json = (
-                json.dumps(asdict(fn.source_location)) if fn.source_location else "{}"
-            )
+            loc_json = json.dumps(asdict(fn.source_location)) if fn.source_location else "{}"
             cur.execute(
                 """
                 INSERT INTO footnotes (
@@ -358,9 +352,7 @@ class SQLiteDatabase(DatabaseInterface):
             )
 
         for img in chapter.image_placeholders:
-            loc_json = (
-                json.dumps(asdict(img.source_location)) if img.source_location else "{}"
-            )
+            loc_json = json.dumps(asdict(img.source_location)) if img.source_location else "{}"
             cur.execute(
                 """
                 INSERT INTO images (

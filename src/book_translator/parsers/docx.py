@@ -84,11 +84,7 @@ class DocxParser(BaseParser):
                             fn_id = fn_node.get(f"{NS_W}id")
                             # IDs negativos (-1, 0) são reservadas para separadores no Word
                             if fn_id and int(fn_id) > 0:
-                                texts = [
-                                    t.text
-                                    for t in fn_node.iter(f"{NS_W}t")
-                                    if t.text
-                                ]
+                                texts = [t.text for t in fn_node.iter(f"{NS_W}t") if t.text]
                                 if texts:
                                     footnotes_dict[fn_id] = "".join(texts).strip()
                     except Exception as e:
@@ -205,11 +201,7 @@ class DocxParser(BaseParser):
                         if ref_id and ref_id in footnotes_dict:
                             referenced_fn_ids.append(ref_id)
 
-                    run_texts = [
-                        t.text
-                        for t in child.findall(f"{NS_W}t")
-                        if t.text
-                    ]
+                    run_texts = [t.text for t in child.findall(f"{NS_W}t") if t.text]
                     run_text = "".join(run_texts)
                     if run_text:
                         start_pos = curr_pos

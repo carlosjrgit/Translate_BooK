@@ -86,3 +86,43 @@ def test_inspector_detect_formats(tmp_path: Path) -> None:
     html_f = tmp_path / "c.html"
     html_f.write_text("<html></html>", encoding="utf-8")
     assert inspector.detect_format(html_f) == "html"
+
+
+def test_inspector_all_formats_and_case_insensitivity(tmp_path: Path) -> None:
+    """Verifica detecção com extensões maiúsculas e formatos binários."""
+    inspector = IngestionInspector()
+
+    # Formatos textuais com extensões variadas
+    txt_upper = tmp_path / "file.TXT"
+    txt_upper.write_text("Text", encoding="utf-8")
+    assert inspector.detect_format(txt_upper) == "txt"
+
+    md_upper = tmp_path / "file.MARKDOWN"
+    md_upper.write_text("# Heading", encoding="utf-8")
+    assert inspector.detect_format(md_upper) == "markdown"
+
+    htm_upper = tmp_path / "file.HTM"
+    htm_upper.write_text("<html><body></body></html>", encoding="utf-8")
+    assert inspector.detect_format(htm_upper) == "html"
+
+    # PDF com extensão maiúscula e magic bytes
+    pdf_upper = tmp_path / "doc.PDF"
+    pdf_upper.write_bytes(b"%PDF-1.4 header content")
+    assert inspector.detect_format(pdf_upper) == "pdf"
+
+    # Arquivo sem extensão com magic bytes de PDF
+    no_ext_pdf = tmp_path / "sample_pdf_no_ext"
+    no_ext_pdf.write_bytes(b"%PDF-1.7 raw content")
+    assert inspector.detect_format(no_ext_pdf) == "pdf"
+
+
+def test_needs_ocr_error_hierarchy() -> None:
+    """Valida a hierarquia de exceções para erro de OCR."""
+    from book_translator.errors import BookTranslatorError, NeedsOcrError, ParsingError
+
+    assert issubclass(NeedsOcrError, ParsingError)
+    assert issubclass(NeedsOcrError, BookTranslatorError)
+
+    err = NeedsOcrError("PDF digitalizado requer OCR", details={"scanned_pages": 10})
+    assert "PDF digitalizado requer OCR" in str(err)
+    assert err.details["scanned_pages"] == 10

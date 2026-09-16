@@ -10,13 +10,11 @@ class Identifiable(Protocol):
     """Contrato para objetos dotados de ID único."""
 
     @property
-    def id(self) -> str:
-        ...
+    def id(self) -> str: ...
 
 
 @runtime_checkable
 class Serializable(Protocol):
     """Contrato para entidades que podem ser serializadas em dicionários primitivos."""
 
-    def to_dict(self) -> dict[str, Any]:
-        ...
+    def to_dict(self) -> dict[str, Any]: ...

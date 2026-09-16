@@ -17,7 +17,7 @@ logger = get_logger("parsers.base")
 # 100 MB por padrão como salvaguarda contra consumo descontrolado de memória
 DEFAULT_MAX_FILE_SIZE = 100 * 1024 * 1024
 
-DIALOGUE_MARKERS = ("—", "–", "―", "“", "”", "\"", "«", "»")
+DIALOGUE_MARKERS = ("—", "–", "―", "“", "”", '"', "«", "»")
 DASH_REGEX = re.compile(r"^[\s]*[—–―\-]\s*(.*)$")
 QUOTE_REGEX = re.compile(r"^[\s]*[\"“«](.*)[\"”»][\s]*$")
 
