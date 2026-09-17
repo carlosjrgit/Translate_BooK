@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
+from book_translator.analysis.models import AnalyzedEntity, Relationship
 from book_translator.core.models import Document
 
 
@@ -12,6 +13,9 @@ from book_translator.core.models import Document
 class AnalysisReport:
     """Relatório resultante da varredura analítica preliminar da obra."""
 
+    entities: list[AnalyzedEntity] = field(default_factory=list)
+    relationships: list[Relationship] = field(default_factory=list)
+    recurrent_concepts: list[str] = field(default_factory=list)
     detected_characters: list[dict[str, Any]] = field(default_factory=list)
     detected_locations: list[str] = field(default_factory=list)
     detected_organizations: list[str] = field(default_factory=list)

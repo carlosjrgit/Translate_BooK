@@ -118,8 +118,13 @@ O objetivo deste projeto é fornecer uma esteira editorial automatizada que rece
 - **`normalization`**: Executa normalização Unicode canônica (NFKC), normalização de espaços em branco, padronização de aspas/hífens editoriais e classificação de blocos de diálogo via marcadores canônicos (`—`, `–`, `"`, `«`).
 
 ### 3.3 `analysis`
-- Varre a obra integralmente antes do início da tradução.
-- Identifica personagens, locais, organizações, termos recorrentes, cronologia, formas de tratamento e registro estilístico predominante para inicializar as memórias do projeto.
+- Varre a obra integralmente antes do início da tradução para caracterizar o universo e o estilo da obra:
+  - **`BookAnalyzer`**: Orquestrador central de análise que realiza a leitura integral da hierarquia documental sem inventar informações ausentes.
+  - **NER Abstrato e Plugável (`NERInterface`)**: Interface desacoplada que permite plugar diferentes motores de reconhecimento de entidades (heurísticos, modelos locais spaCy/transformers ou LLMs) sem reescrever a lógica de domínio. Implementação inicial funcional e leve via `HeuristicNER`.
+  - **Diferenciação Fato vs. Inferência**: Fatos observados (menções, contagem de ocorrências, offsets, snippets) são registrados em `EntityOccurrence`. Inferências (gênero gramatical, resoluções de alias) são explicitamente registradas em `EntityInference` com nível de confiança (0.0 a 1.0) e snippet de evidência textual de origem.
+  - **Consolidação de Aliases e Tratamento de Homônimos (`AliasResolver`)**: Consolida menções unívocas (ex: "Dr. John Watson" e "Watson") em entidades canônicas únicas; marca homônimos ambíguos (ex: múltiplos personagens compartilhando o mesmo sobrenome "Henderson") com a flag `is_ambiguous = True` sem fusão forçada.
+  - **Extração de Relações (`RelationExtractor`)**: Extrai laços familiares e interpessoais (ex: "Arthur's mother Margaret" -> `mother_of`) com vínculos explícitos entre entidades, tipo de relação, confiança e citação textual de evidência.
+  - **Persistência em Memórias**: Popula automaticamente o banco do projeto (`CharacterEntry`, `Entity`, `GlossaryEntry` e estimativa de narrador na `StyleBible`).
 
 ### 3.4 `memory`
 - **`CharacterMemory`**: Mapeia personagens, aliases, relações familiares/hierárquicas, sexo/gênero gramatical (para concordância de pronomes) e registro de fala.
