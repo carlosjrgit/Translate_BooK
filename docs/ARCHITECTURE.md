@@ -127,10 +127,14 @@ O objetivo deste projeto é fornecer uma esteira editorial automatizada que rece
   - **Persistência em Memórias**: Popula automaticamente o banco do projeto (`CharacterEntry`, `Entity`, `GlossaryEntry` e estimativa de narrador na `StyleBible`).
 
 ### 3.4 `memory`
-- **`CharacterMemory`**: Mapeia personagens, aliases, relações familiares/hierárquicas, sexo/gênero gramatical (para concordância de pronomes) e registro de fala.
-- **`TranslationMemory`**: Armazena termos e construções frasais recorrentes com status `locked` para impedir oscilações entre capítulos distantes.
-- **`Glossary`**: Conceitos técnicos, organizações e vocabulário com case-sensitivity e notas de contexto.
-- **`StyleBible`**: Diretrizes editoriais da obra (narrador, formalidade, uso de você/tu/senhor, profanidades, convenção de pontuação).
+- Camada responsável pela persistência, integridade e governança de memórias editoriais de longo prazo:
+  - **`CharacterMemory`**: Mapeia perfis de personagens, nome canônico, aliases alternativos, formas de tratamento honorífico (`treatment`), atributos linguisticamente relevantes (`linguistic_traits`, `speech_style`, `gender`), relações interpessoais, evidências textuais de origem e índice de confiança. Suporta detecção de homônimos e colisões de aliases.
+  - **`Glossary`**: Mapeia termos técnicos, conceitos do universo, organizações e vocabulário com campos `source_term`, `target_term`, `entry_type`, `aliases`, flag de travamento `locked`, `case_sensitive`, contexto semântico, primeira ocorrência e notas.
+  - **`TranslationMemory` (TM)**: Armazena segmentos, frases e construções recorrentes com `source_term`, `target_term`, `context`, `origin` (`user`, `madlad`, `review`, etc.), `status` (`active`, `approved`, `rejected`), `locked` e `confidence`.
+  - **`MemoryManager`**: Fachada unificada que coordena as três memórias, a `StyleBible` e o banco relacional. Implementa validação cruzada (`detect_all_conflicts`) para identificar divergências entre glossário e TM (ex: mesmo termo com traduções conflitantes) e verificação de conformidade de termos travados (`verify_all_locked_terms`).
+  - **Regra de Não-Substituição Cega**: Utiliza correspondência de fronteira léxica baseada em regex inteligente (`build_word_boundary_pattern`) com respeito a `case_sensitive`, garantindo que substrings (ex: "art" em "part") nunca sejam substituídas cegamente.
+  - **Governança e Travamento (`locked`)**: Termos e segmentos com `locked=True` não podem ser alterados ou sobrescritos sem autorização explícita (`force=True`).
+  - **Auditoria e Versionamento**: Toda alteração cria instâncias imutáveis de `MemoryRevision` (com `revision_id`, `timestamp`, `changed_by`, `field_name`, `old_value`, `new_value` e `reason`) serializadas no JSON da entidade e gravadas na tabela relacional `memory_audit_log`.
 
 ### 3.5 `context`
 - **`ContextRetrieval`**: Seleciona e empacota o contexto ótimo para o segmento atual (parágrafos limítrofes, resumo local, personagens presentes na cena e termos aplicáveis do glossário), evitando tanto subcontexto quanto sobrecarga do modelo.
@@ -163,6 +167,7 @@ O objetivo deste projeto é fornecer uma esteira editorial automatizada que rece
   - `v0001_initial_schema.sql`: Tabelas fundamentais de projetos, documentos, capítulos, seções, parágrafos, segmentos, entidades, personagens, glossário, memórias de tradução, bíblia de estilo, traduções, revisões, QA, eventos e checkpoints.
   - `v0002_add_indices.sql`: Índices de performance para busca por `project_id`, `chapter_id`, `reading_order` e termos de busca.
   - `v0003_rich_document_units.sql`: Tabelas e colunas para unidades editoriais ricas (`headings`, `dialogues`, `footnotes`, `images`, `references_bibliography`, `spans_json` e `source_location_json`).
+  - `v0004_memory_audit_and_enrichment.sql`: Enriquecimento das tabelas de memórias (`treatment`, `evidences_json`, `confidence`, `history_json` em characters; `history_json` em glossary; `context`, `origin`, `status`, `confidence`, `history_json` em translation_memory) e criação da tabela relacional indexada `memory_audit_log`.
 - Suporta tradução incremental com checkpointing a cada segmento (pausa, retomada e recuperação contra falhas).
 
 ### 3.10 `export`

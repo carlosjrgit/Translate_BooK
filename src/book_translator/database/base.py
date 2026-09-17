@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from book_translator.context.base import TranslationContext
 from book_translator.core.models import (
@@ -127,6 +127,30 @@ class DatabaseInterface(Protocol):
 
     def get_style_bible(self, project_id: str) -> StyleBible | None:
         """Recupera a Style Bible do projeto."""
+        ...
+
+    def record_memory_audit(
+        self,
+        project_id: str,
+        memory_type: str,
+        entry_id: str,
+        term_or_name: str,
+        field_changed: str,
+        old_value: Any = "",
+        new_value: Any = "",
+        changed_by: str = "user",
+        reason: str = "",
+    ) -> None:
+        """Registra uma alteração no log relacional de auditoria de memórias."""
+        ...
+
+    def get_memory_audit_log(
+        self,
+        project_id: str,
+        entry_id: str | None = None,
+        memory_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Recupera registros do log relacional de auditoria de memórias."""
         ...
 
     # Contexto e Traduções

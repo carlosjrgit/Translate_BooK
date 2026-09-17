@@ -36,6 +36,7 @@ from book_translator.errors import DatabaseError
 from book_translator.memory.base import (
     CharacterEntry,
     GlossaryEntry,
+    MemoryRevision,
     StyleBible,
     TranslationMemoryEntry,
 )
@@ -840,8 +841,9 @@ class SQLiteDatabase(DatabaseInterface):
                 """
                 INSERT INTO characters (
                     id, project_id, name, gender, speech_style, linguistic_traits,
-                    first_appearance, occurrences, notes, aliases_json, relations_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    first_appearance, occurrences, notes, aliases_json, relations_json,
+                    treatment, evidences_json, confidence, history_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     name=excluded.name,
                     gender=excluded.gender,
@@ -851,11 +853,15 @@ class SQLiteDatabase(DatabaseInterface):
                     occurrences=excluded.occurrences,
                     notes=excluded.notes,
                     aliases_json=excluded.aliases_json,
-                    relations_json=excluded.relations_json;
+                    relations_json=excluded.relations_json,
+                    treatment=excluded.treatment,
+                    evidences_json=excluded.evidences_json,
+                    confidence=excluded.confidence,
+                    history_json=excluded.history_json;
                 """,
                 (
-                    character.id,
-                    project_id,
+                    str(character.id),
+                    str(project_id),
                     character.name,
                     character.gender,
                     character.speech_style,
@@ -865,6 +871,10 @@ class SQLiteDatabase(DatabaseInterface):
                     character.notes,
                     json.dumps(character.aliases),
                     json.dumps(character.relations),
+                    getattr(character, "treatment", ""),
+                    json.dumps(getattr(character, "evidences", [])),
+                    getattr(character, "confidence", 1.0),
+                    json.dumps([h.to_dict() for h in getattr(character, "history", [])]),
                 ),
             )
 
@@ -872,22 +882,37 @@ class SQLiteDatabase(DatabaseInterface):
         cur = self.conn.cursor()
         try:
             sql = "SELECT * FROM characters WHERE project_id = ? ORDER BY occurrences DESC;"
-            cur.execute(sql, (project_id,))
-            return [
-                CharacterEntry(
-                    id=r["id"],
-                    name=r["name"],
-                    gender=r["gender"],
-                    speech_style=r["speech_style"],
-                    linguistic_traits=[t for t in r["linguistic_traits"].split(",") if t],
-                    first_appearance=r["first_appearance"],
-                    occurrences=r["occurrences"],
-                    notes=r["notes"],
-                    aliases=json.loads(r["aliases_json"] or "[]"),
-                    relations=json.loads(r["relations_json"] or "[]"),
+            cur.execute(sql, (str(project_id),))
+            entries = []
+            for r in cur.fetchall():
+                keys = r.keys()
+                hist_raw = json.loads(r["history_json"] or "[]") if "history_json" in keys else []
+                evid_raw = (
+                    json.loads(r["evidences_json"] or "[]") if "evidences_json" in keys else []
                 )
-                for r in cur.fetchall()
-            ]
+                entries.append(
+                    CharacterEntry(
+                        id=r["id"],
+                        name=r["name"],
+                        gender=r["gender"],
+                        speech_style=r["speech_style"],
+                        linguistic_traits=[t for t in r["linguistic_traits"].split(",") if t],
+                        first_appearance=r["first_appearance"],
+                        occurrences=r["occurrences"],
+                        notes=r["notes"],
+                        aliases=json.loads(r["aliases_json"] or "[]"),
+                        relations=json.loads(r["relations_json"] or "[]"),
+                        treatment=r["treatment"] if "treatment" in keys else "",
+                        evidences=evid_raw,
+                        confidence=(
+                            float(r["confidence"])
+                            if "confidence" in keys and r["confidence"] is not None
+                            else 1.0
+                        ),
+                        history=[MemoryRevision.from_dict(h) for h in hist_raw],
+                    )
+                )
+            return entries
         finally:
             cur.close()
 
@@ -899,8 +924,8 @@ class SQLiteDatabase(DatabaseInterface):
                 INSERT INTO glossary (
                     id, project_id, source_term, target_term, entry_type, description,
                     aliases_json, case_sensitive, locked, gender, plural, context,
-                    first_occurrence, occurrences, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    first_occurrence, occurrences, notes, history_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     target_term=excluded.target_term,
                     entry_type=excluded.entry_type,
@@ -912,11 +937,12 @@ class SQLiteDatabase(DatabaseInterface):
                     plural=excluded.plural,
                     context=excluded.context,
                     occurrences=excluded.occurrences,
-                    notes=excluded.notes;
+                    notes=excluded.notes,
+                    history_json=excluded.history_json;
                 """,
                 (
-                    entry_id,
-                    project_id,
+                    str(entry_id),
+                    str(project_id),
                     entry.source_term,
                     entry.target_term,
                     entry.entry_type,
@@ -930,6 +956,7 @@ class SQLiteDatabase(DatabaseInterface):
                     entry.first_occurrence,
                     entry.occurrences,
                     entry.notes,
+                    json.dumps([h.to_dict() for h in getattr(entry, "history", [])]),
                 ),
             )
 
@@ -937,25 +964,30 @@ class SQLiteDatabase(DatabaseInterface):
         cur = self.conn.cursor()
         try:
             sql = "SELECT * FROM glossary WHERE project_id = ? ORDER BY source_term ASC;"
-            cur.execute(sql, (project_id,))
-            return [
-                GlossaryEntry(
-                    source_term=r["source_term"],
-                    target_term=r["target_term"],
-                    entry_type=r["entry_type"],
-                    description=r["description"],
-                    aliases=json.loads(r["aliases_json"] or "[]"),
-                    case_sensitive=bool(r["case_sensitive"]),
-                    locked=bool(r["locked"]),
-                    gender=r["gender"],
-                    plural=r["plural"],
-                    context=r["context"],
-                    first_occurrence=r["first_occurrence"],
-                    occurrences=r["occurrences"],
-                    notes=r["notes"],
+            cur.execute(sql, (str(project_id),))
+            entries = []
+            for r in cur.fetchall():
+                keys = r.keys()
+                hist_raw = json.loads(r["history_json"] or "[]") if "history_json" in keys else []
+                entries.append(
+                    GlossaryEntry(
+                        source_term=r["source_term"],
+                        target_term=r["target_term"],
+                        entry_type=r["entry_type"],
+                        description=r["description"],
+                        aliases=json.loads(r["aliases_json"] or "[]"),
+                        case_sensitive=bool(r["case_sensitive"]),
+                        locked=bool(r["locked"]),
+                        gender=r["gender"],
+                        plural=r["plural"],
+                        context=r["context"],
+                        first_occurrence=r["first_occurrence"],
+                        occurrences=r["occurrences"],
+                        notes=r["notes"],
+                        history=[MemoryRevision.from_dict(h) for h in hist_raw],
+                    )
                 )
-                for r in cur.fetchall()
-            ]
+            return entries
         finally:
             cur.close()
 
@@ -966,40 +998,127 @@ class SQLiteDatabase(DatabaseInterface):
                 """
                 INSERT INTO translation_memory (
                     id, project_id, source_term, target_term,
-                    entry_type, locked, first_chapter, occurrences
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    entry_type, locked, first_chapter, occurrences,
+                    context, origin, status, confidence, history_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     target_term=excluded.target_term,
                     locked=excluded.locked,
-                    occurrences=excluded.occurrences;
+                    occurrences=excluded.occurrences,
+                    context=excluded.context,
+                    origin=excluded.origin,
+                    status=excluded.status,
+                    confidence=excluded.confidence,
+                    history_json=excluded.history_json;
                 """,
                 (
-                    entry_id,
-                    project_id,
+                    str(entry_id),
+                    str(project_id),
                     entry.source_term,
                     entry.target_term,
                     entry.entry_type,
                     1 if entry.locked else 0,
                     entry.first_chapter,
                     entry.occurrences,
+                    getattr(entry, "context", ""),
+                    getattr(entry, "origin", "user"),
+                    getattr(entry, "status", "active"),
+                    getattr(entry, "confidence", 1.0),
+                    json.dumps([h.to_dict() for h in getattr(entry, "history", [])]),
                 ),
             )
 
     def get_tm(self, project_id: str) -> list[TranslationMemoryEntry]:
         cur = self.conn.cursor()
         try:
-            cur.execute("SELECT * FROM translation_memory WHERE project_id = ?;", (project_id,))
-            return [
-                TranslationMemoryEntry(
-                    source_term=r["source_term"],
-                    target_term=r["target_term"],
-                    entry_type=r["entry_type"],
-                    locked=bool(r["locked"]),
-                    first_chapter=r["first_chapter"],
-                    occurrences=r["occurrences"],
+            cur.execute(
+                "SELECT * FROM translation_memory WHERE project_id = ?;", (str(project_id),)
+            )
+            entries = []
+            for r in cur.fetchall():
+                keys = r.keys()
+                hist_raw = json.loads(r["history_json"] or "[]") if "history_json" in keys else []
+                entries.append(
+                    TranslationMemoryEntry(
+                        source_term=r["source_term"],
+                        target_term=r["target_term"],
+                        entry_type=r["entry_type"],
+                        locked=bool(r["locked"]),
+                        first_chapter=r["first_chapter"],
+                        occurrences=r["occurrences"],
+                        context=r["context"] if "context" in keys else "",
+                        origin=r["origin"] if "origin" in keys else "user",
+                        status=r["status"] if "status" in keys else "active",
+                        confidence=(
+                            float(r["confidence"])
+                            if "confidence" in keys and r["confidence"] is not None
+                            else 1.0
+                        ),
+                        history=[MemoryRevision.from_dict(h) for h in hist_raw],
+                    )
                 )
-                for r in cur.fetchall()
-            ]
+            return entries
+        finally:
+            cur.close()
+
+    def record_memory_audit(
+        self,
+        project_id: str,
+        memory_type: str,
+        entry_id: str,
+        term_or_name: str,
+        field_changed: str,
+        old_value: Any = "",
+        new_value: Any = "",
+        changed_by: str = "user",
+        reason: str = "",
+    ) -> None:
+        """Registra uma alteração no log de auditoria de memórias."""
+        import uuid
+
+        audit_id = f"audit_{uuid.uuid4().hex[:12]}"
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO memory_audit_log (
+                    id, project_id, memory_type, entry_id, term_or_name,
+                    field_changed, old_value, new_value, changed_by, reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    audit_id,
+                    str(project_id),
+                    memory_type,
+                    str(entry_id),
+                    term_or_name,
+                    field_changed,
+                    str(old_value) if old_value is not None else "",
+                    str(new_value) if new_value is not None else "",
+                    changed_by,
+                    reason,
+                ),
+            )
+
+    def get_memory_audit_log(
+        self,
+        project_id: str,
+        entry_id: str | None = None,
+        memory_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Recupera registros do log relacional de auditoria de memórias."""
+        cur = self.conn.cursor()
+        try:
+            query = "SELECT * FROM memory_audit_log WHERE project_id = ?"
+            params: list[Any] = [str(project_id)]
+            if entry_id:
+                query += " AND entry_id = ?"
+                params.append(str(entry_id))
+            if memory_type:
+                query += " AND memory_type = ?"
+                params.append(memory_type)
+            query += " ORDER BY created_at DESC;"
+            cur.execute(query, params)
+            return [dict(r) for r in cur.fetchall()]
         finally:
             cur.close()
 
@@ -1023,24 +1142,34 @@ class SQLiteDatabase(DatabaseInterface):
                 """,
                 (
                     sb_id,
-                    project_id,
+                    str(project_id),
                     style_bible.narrator,
                     style_bible.register,
                     style_bible.dialogue_style,
                     style_bible.profanity_handling,
                     style_bible.predominant_treatment,
                     style_bible.punctuation_standard,
-                    json.dumps(style_bible.metadata),
+                    json.dumps(
+                        {
+                            **style_bible.metadata,
+                            "tone": getattr(style_bible, "tone", "literário"),
+                            "formality_level": getattr(style_bible, "formality_level", "formal"),
+                            "custom_rules": getattr(style_bible, "custom_rules", {}),
+                        }
+                    ),
                 ),
             )
 
     def get_style_bible(self, project_id: str) -> StyleBible | None:
         cur = self.conn.cursor()
         try:
-            cur.execute("SELECT * FROM style_bible WHERE project_id = ? LIMIT 1;", (project_id,))
+            cur.execute(
+                "SELECT * FROM style_bible WHERE project_id = ? LIMIT 1;", (str(project_id),)
+            )
             row = cur.fetchone()
             if not row:
                 return None
+            meta = json.loads(row["metadata_json"] or "{}")
             return StyleBible(
                 narrator=row["narrator"],
                 register=row["register"],
@@ -1048,7 +1177,11 @@ class SQLiteDatabase(DatabaseInterface):
                 profanity_handling=row["profanity_handling"],
                 predominant_treatment=row["predominant_treatment"],
                 punctuation_standard=row["punctuation_standard"],
-                metadata=json.loads(row["metadata_json"] or "{}"),
+                project_id=str(project_id),
+                tone=meta.get("tone", "literário"),
+                formality_level=meta.get("formality_level", "formal"),
+                custom_rules=meta.get("custom_rules", {}),
+                metadata=meta,
             )
         finally:
             cur.close()

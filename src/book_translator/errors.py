@@ -43,6 +43,14 @@ class MemoryError(BookTranslatorError):
     """Lançado em operações de memórias (Character, Translation Memory, Glossary)."""
 
 
+class LockedTermError(MemoryError):
+    """Lançado ao tentar alterar, sobrescrever ou violar um termo com status locked=True."""
+
+
+class MemoryConflictError(MemoryError):
+    """Lançado quando há conflito de tradução, colisão de aliases ou incoerência entre memórias."""
+
+
 class TranslationEngineError(BookTranslatorError):
     """Lançado quando o motor de tradução ou seu adaptador falha."""
 
