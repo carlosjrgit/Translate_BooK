@@ -33,7 +33,6 @@ from book_translator.export.manager import ExportManager
 from book_translator.memory.base import GlossaryEntry
 from book_translator.qa import DeterministicQAEngine, UnifiedQAOrchestrator
 from book_translator.system.hardware import HardwareProfiler
-from book_translator.translation.base import TranslationCandidate, TranslationDraft, TranslationEngine
 from book_translator.translation.madlad import (
     DeviceType,
     MadladTranslationEngine,
@@ -300,8 +299,8 @@ def run_benchmark() -> dict[str, any]:
 def generate_markdown_report(data: dict[str, any], output_file: Path) -> None:
     content = f"""# Relatório Final Consolidado de Benchmark e Validação End-to-End
 
-Data de Emissão: {time.strftime('%Y-%m-%d %H:%M:%S')}  
-Plataforma: {sys.platform} (Python {sys.version.split()[0]})  
+Data de Emissão: {time.strftime('%Y-%m-%d %H:%M:%S')}
+Plataforma: {sys.platform} (Python {sys.version.split()[0]})
 Status de Release: **APROVADO PARA EMPACOTAMENTO (PROMPT 28)**
 
 ---
