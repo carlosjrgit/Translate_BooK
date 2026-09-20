@@ -64,12 +64,12 @@ models/weights/
 *.part
 
 # Application runtime data & Project databases
-projects/
-.projects/
-cache/
-.cache/
-logs/
-output/
+/projects/
+/.projects/
+/cache/
+/.cache/
+/logs/
+/output/
 *.sqlite
 *.sqlite3
 *.db
