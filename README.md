@@ -1,6 +1,6 @@
 # Translate Book CJrTools — Tradutor Editorial Inteligente de Livros (EN → PT-BR)
 
-[![CI Pipeline](https://github.com/carlosjrgit/Translate_BooK/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosjrgit/Translate_BooK/actions/workflows/ci.yml)
+[![CI Pipeline](https://github.com/carlosjrgit/Translate_Book_CJrTools/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosjrgit/Translate_Book_CJrTools/actions/workflows/ci.yml)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Privacy: 100% Local](https://img.shields.io/badge/Privacy-100%25%20Local-success)](#privacidade-e-processamento-local)
@@ -79,7 +79,7 @@ O aplicativo adapta-se automaticamente à capacidade do seu computador através 
 ## Instalação
 
 ### Opção 1: Instalador Oficial para Windows (Recomendado)
-1. Baixe o instalador oficial `Translate_Book_CJrTools_Setup_v1.0.0.exe` na aba [GitHub Releases](https://github.com/carlosjrgit/Translate_BooK/releases).
+1. Baixe o instalador oficial `Translate_Book_CJrTools_Setup_v1.0.0.exe` na aba [GitHub Releases](https://github.com/carlosjrgit/Translate_Book_CJrTools/releases).
 2. Execute o instalador. Não são necessários privilégios de Administrador (instalação isolada em `%LOCALAPPDATA%\Programs\Translate_Book_CJrTools`).
 3. O executável é standalone e **não requer Python pré-instalado**.
 4. Inicie o **Translate Book CJrTools** diretamente pelo atalho na Área de Trabalho ou Menu Iniciar.
@@ -88,8 +88,8 @@ O aplicativo adapta-se automaticamente à capacidade do seu computador através 
 ### Opção 2: Instalação a partir do Código-Fonte (Desenvolvedores)
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/carlosjrgit/Translate_BooK.git
-cd Translate_BooK
+git clone https://github.com/carlosjrgit/Translate_Book_CJrTools.git
+cd Translate_Book_CJrTools
 
 # 2. Crie e ative um ambiente virtual
 python -m venv .venv
