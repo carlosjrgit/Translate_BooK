@@ -70,8 +70,18 @@ def test_data_isolation_frozen_vs_dev(tmp_path):
     fake_exe = frozen_app_dir / "Translate_BooK.exe"
     fake_exe.touch()
 
+    fake_app_data = tmp_path / "AppData" / "Roaming"
+    fake_local_app_data = tmp_path / "AppData" / "Local"
+    fake_app_data.mkdir(parents=True)
+    fake_local_app_data.mkdir(parents=True)
+
     with patch.object(sys, "frozen", True, create=True), \
-         patch.object(sys, "executable", str(fake_exe)):
+         patch.object(sys, "executable", str(fake_exe)), \
+         patch.object(sys, "platform", "win32"), \
+         patch.dict(os.environ, {
+             "APPDATA": str(fake_app_data),
+             "LOCALAPPDATA": str(fake_local_app_data)
+         }):
 
         dirs = get_default_data_dirs()
 
@@ -103,6 +113,7 @@ def test_paths_with_spaces_handling(tmp_path):
 
     with patch.object(sys, "frozen", True, create=True), \
          patch.object(sys, "executable", str(fake_exe)), \
+         patch.object(sys, "platform", "win32"), \
          patch.dict(os.environ, {
              "APPDATA": str(fake_app_data),
              "LOCALAPPDATA": str(fake_local_app_data)

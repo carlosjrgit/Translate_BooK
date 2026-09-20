@@ -52,7 +52,7 @@ def get_default_data_dirs() -> DataDirs:
             app_dir=app_dir,
         )
 
-    if is_frozen and sys.platform == "win32":
+    if is_frozen and (sys.platform == "win32" or (os.environ.get("APPDATA") and os.environ.get("LOCALAPPDATA"))):
         appdata = os.environ.get("APPDATA")
         localappdata = os.environ.get("LOCALAPPDATA")
         if appdata and localappdata:

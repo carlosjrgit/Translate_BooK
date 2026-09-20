@@ -31,6 +31,9 @@ class PrivacySanitizingFilter(logging.Filter):
         # 2. Mascara caminhos pessoais do usuário para evitar vazamento em logs compartilhados
         if self.user_home and len(self.user_home) > 3:
             clean = clean.replace(self.user_home, "[HOME_DIR]")
+        # Padrões genéricos de caminhos de usuário no Windows (C:\Users\<user>) e Linux (/home/<user>)
+        clean = re.sub(r"[a-zA-Z]:\\Users\\[^\\]+", "[HOME_DIR]", clean)
+        clean = re.sub(r"/home/[^/]+", "[HOME_DIR]", clean)
         if self.user_name and len(self.user_name) > 2:
             clean = re.sub(rf"\b{re.escape(self.user_name)}\b", "[USER]", clean)
         return clean
