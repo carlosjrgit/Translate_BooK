@@ -32,108 +32,37 @@ from book_translator.translation import (
     TranslationPipeline,
     TranslationPipelineConfig,
 )
+from book_translator.ui.components.about_widget import AboutWidget
 from book_translator.ui.components.advanced_panel import AdvancedSettingsPanel
 from book_translator.ui.components.analysis_summary_widget import AnalysisSummaryWidget
 from book_translator.ui.components.metrics_bar import MetricsBar
 from book_translator.ui.components.qa_alerts_widget import QAAlertsWidget
+from book_translator.ui.theme import (
+    APP_STYLESHEET,
+    COLOR_ACCENT,
+    COLOR_BORDER_SUBTLE,
+    COLOR_ERROR,
+    COLOR_SUCCESS,
+    COLOR_SURFACE,
+    COLOR_TEXT_PRIMARY,
+    COLOR_WARNING,
+    FONT_MONOSPACE,
+    RADIUS_DEFAULT,
+)
 from book_translator.ui.worker import PipelineWorker
 
 logger = get_logger("ui.main_window")
 
 
-DARK_THEME_QSS = """
-QMainWindow, QWidget {
-    background-color: #1e1e2e;
-    color: #cdd6f4;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 13px;
-}
-QGroupBox {
-    border: 1px solid #313244;
-    border-radius: 8px;
-    margin-top: 14px;
-    padding-top: 14px;
-    font-weight: bold;
-    color: #89b4fa;
-}
-QGroupBox::title {
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    left: 12px;
-    padding: 0 4px;
-}
-QPushButton {
-    background-color: #89b4fa;
-    color: #11111b;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-weight: bold;
-}
-QPushButton:hover {
-    background-color: #b4befe;
-}
-QPushButton:disabled {
-    background-color: #45475a;
-    color: #7f849c;
-}
-QLineEdit, QComboBox, QSpinBox {
-    background-color: #181825;
-    border: 1px solid #313244;
-    border-radius: 6px;
-    padding: 6px;
-    color: #cdd6f4;
-}
-QTableWidget {
-    background-color: #181825;
-    alternate-background-color: #1e1e2e;
-    border: 1px solid #313244;
-    border-radius: 6px;
-    gridline-color: #313244;
-}
-QHeaderView::section {
-    background-color: #313244;
-    color: #cdd6f4;
-    padding: 6px;
-    font-weight: bold;
-    border: 1px solid #181825;
-}
-QTabWidget::pane {
-    border: 1px solid #313244;
-    border-radius: 6px;
-    background-color: #181825;
-}
-QTabBar::tab {
-    background-color: #181825;
-    color: #a6adc8;
-    padding: 8px 16px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    margin-right: 2px;
-}
-QTabBar::tab:selected {
-    background-color: #313244;
-    color: #89b4fa;
-    font-weight: bold;
-}
-QTextEdit {
-    background-color: #11111b;
-    border: 1px solid #313244;
-    border-radius: 6px;
-    color: #a6adc8;
-    font-family: 'Consolas', monospace;
-    font-size: 11px;
-}
-"""
-
-
 class MainWindow(QMainWindow):
-    """Interface Gráfica do Translate_BooK cobrindo as 11 etapas do fluxo editorial."""
+    """Interface Gráfica do Translate Book CJrTools cobrindo as 11 etapas do fluxo editorial."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Translate_BooK — Tradução Literária Profissional (EN -> PT-BR)")
-        self.resize(1100, 780)
-        self.setStyleSheet(DARK_THEME_QSS)
+        self.setWindowTitle("Translate Book CJrTools — Tradução Editorial Profissional (EN -> PT-BR)")
+        self.resize(1150, 800)
+        self.setMinimumSize(850, 600)
+        self.setStyleSheet(APP_STYLESHEET)
 
         # Estado do Projeto e Pipeline
         self.project_manager = ProjectManager(base_projects_dir=Path(".projects"))
@@ -156,14 +85,14 @@ class MainWindow(QMainWindow):
 
         # 1. Header com Status do Idioma e Hardware
         header_row = QHBoxLayout()
-        title_label = QLabel("TRANSLATE_BOOK", self)
-        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #89b4fa; letter-spacing: 1px;")
+        title_label = QLabel("Translate Book CJrTools", self)
+        title_label.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {COLOR_ACCENT}; letter-spacing: 0.5px;")
         header_row.addWidget(title_label)
 
         header_row.addSpacing(12)
         lang_badge = QLabel("EN ➔ PT-BR", self)
         lang_badge.setStyleSheet(
-            "background-color: #89b4fa; color: #11111b; font-weight: bold; border-radius: 4px; padding: 3px 8px;"
+            f"background-color: {COLOR_ACCENT}; color: #1A1A1A; font-weight: 600; border-radius: {RADIUS_DEFAULT}; padding: 3px 10px;"
         )
         header_row.addWidget(lang_badge)
 
@@ -171,7 +100,7 @@ class MainWindow(QMainWindow):
 
         self.lbl_hw_badge = QLabel("Hardware: Detectando...", self)
         self.lbl_hw_badge.setStyleSheet(
-            "background-color: #313244; color: #a6e3a1; font-weight: bold; border-radius: 4px; padding: 4px 10px;"
+            f"background-color: {COLOR_SURFACE}; color: {COLOR_SUCCESS}; border: 1px solid {COLOR_BORDER_SUBTLE}; font-weight: 600; border-radius: {RADIUS_DEFAULT}; padding: 4px 10px; font-size: 12px;"
         )
         header_row.addWidget(self.lbl_hw_badge)
         main_layout.addLayout(header_row)
@@ -183,7 +112,7 @@ class MainWindow(QMainWindow):
         self.metrics_bar.sig_cancel_clicked.connect(self._on_cancel_requested)
         main_layout.addWidget(self.metrics_bar)
 
-        # 3. Abas Principais do Fluxo Editorial (Comum vs Avançado)
+        # 3. Abas Principais do Fluxo Editorial (Fluxo, Avançado, Sobre)
         self.tabs = QTabWidget(self)
 
         # Aba 1: Fluxo Principal da Obra
@@ -199,6 +128,7 @@ class MainWindow(QMainWindow):
         actions_layout.setSpacing(8)
 
         self.btn_select_file = QPushButton("1. Selecionar Arquivo", self)
+        self.btn_select_file.setObjectName("primaryAction")
         self.btn_select_file.clicked.connect(self._on_select_file)
         actions_layout.addWidget(self.btn_select_file)
 
@@ -208,6 +138,7 @@ class MainWindow(QMainWindow):
         actions_layout.addWidget(self.btn_analyze)
 
         self.btn_translate = QPushButton("3. Traduzir Obra", self)
+        self.btn_translate.setObjectName("primaryAction")
         self.btn_translate.setEnabled(False)
         self.btn_translate.clicked.connect(self._on_start_translation)
         actions_layout.addWidget(self.btn_translate)
@@ -242,25 +173,30 @@ class MainWindow(QMainWindow):
         self.advanced_panel = AdvancedSettingsPanel(self)
         self.tabs.addTab(self.advanced_panel, "Modo Avançado")
 
+        # Aba 3: Sobre (About) com Logo Oficial CJRDOOM
+        self.about_view = AboutWidget(self)
+        self.tabs.addTab(self.about_view, "Sobre")
+
         main_layout.addWidget(self.tabs, stretch=1)
 
-        # 4. Log em Tempo Real
+        # 4. Log em Tempo Real Técnico e Monospaçado
         self.log_view = QTextEdit(self)
+        self.log_view.setObjectName("logView")
         self.log_view.setMaximumHeight(110)
         self.log_view.setReadOnly(True)
         main_layout.addWidget(self.log_view)
 
     def _log(self, message: str, level: str = "info") -> None:
         prefix = "[INFO]"
-        color = "#a6adc8"
+        color = COLOR_TEXT_PRIMARY
         if level == "warning":
             prefix = "[AVISO]"
-            color = "#f9e2af"
+            color = COLOR_WARNING
         elif level == "error":
             prefix = "[ERRO]"
-            color = "#f38ba8"
+            color = COLOR_ERROR
 
-        line = f'<span style="color:{color};">{prefix} {message}</span>'
+        line = f'<span style="color:{color}; font-family:{FONT_MONOSPACE};">{prefix} {message}</span>'
         self.log_view.append(line)
 
     def _update_hardware_info(self) -> None:

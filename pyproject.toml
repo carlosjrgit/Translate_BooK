@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "book-translator"
 version = "0.1.0"
-description = "Tradutor Inteligente de Livros e Documentos EN -> PT-BR"
+description = "Translate Book CJrTools — Tradutor Editorial Inteligente de Livros EN -> PT-BR"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "Translate Book Team" }
+    { name = "CJRDOOM" }
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

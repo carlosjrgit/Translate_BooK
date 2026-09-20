@@ -19,8 +19,8 @@ def launch_gui(argv: list[str] | None = None) -> int:
     if app is None:
         app = QApplication(args)
 
-    app.setApplicationName("Translate_BooK")
-    app.setOrganizationName("Antigravity")
+    app.setApplicationName("Translate Book CJrTools")
+    app.setOrganizationName("CJrTools")
 
     window = MainWindow()
     window.show()

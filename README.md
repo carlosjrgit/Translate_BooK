@@ -1,6 +1,6 @@
-# Translate_BooK — Tradutor Editorial Inteligente de Livros (EN → PT-BR)
+# Translate Book CJrTools — Tradutor Editorial Inteligente de Livros (EN → PT-BR)
 
-[![CI Pipeline](https://github.com/seu-usuario/Translate_BooK/actions/workflows/ci.yml/badge.svg)](https://github.com/seu-usuario/Translate_BooK/actions/workflows/ci.yml)
+[![CI Pipeline](https://github.com/carlosjrgit/Translate_BooK/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosjrgit/Translate_BooK/actions/workflows/ci.yml)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Privacy: 100% Local](https://img.shields.io/badge/Privacy-100%25%20Local-success)](#privacidade-e-processamento-local)
@@ -14,9 +14,30 @@ Sistema editorial de tradução automática assistida, contextualmente orientada
 
 > **"Modelo competente + Contexto correto + Memória persistente + Regras + Validação + Auditoria."**
 
-O **Translate_BooK** rejeita a abordagem simplista de enviar parágrafos soltos para chatbots generativos em nuvem. A tradução editorial de um livro completo exige muito mais do que capacidade linguística pura: demanda **coerência intercapítulos**, **preservação de nomes próprios e termos travados**, **memória de relacionamentos entre personagens**, **verificação determinística de tags/estilos** e **auditoria contra alucinações**.
+O **Translate Book CJrTools** rejeita a abordagem simplista de enviar parágrafos soltos para chatbots generativos em nuvem. A tradução editorial de um livro completo exige muito mais do que capacidade linguística pura: demanda **coerência intercapítulos**, **preservação de nomes próprios e termos travados**, **memória de relacionamentos entre personagens**, **verificação determinística de tags/estilos** e **auditoria contra alucinações**.
 
-Todo o processamento é executado **100% localmente no computador do usuário** utilizando o modelo **MADLAD-400** otimizado com a biblioteca de alta velocidade **CTranslate2** em quantização INT8.
+Todo o processamento é executado **100% localmente no computador do usuário** utilizando a família de modelos **MADLAD-400** otimizada com a biblioteca de alta velocidade **CTranslate2** em quantização INT8.
+
+---
+
+## Demonstração Visual da Interface
+
+A interface gráfica do **Translate Book CJrTools** foi concebida sob um rigoroso **Design System Dark, Flat, Minimal e Técnico** (fundo `#2E2D2D`, destaque `#FFAC2B`, tipografia *Inter* e *JetBrains Mono*). Seus componentes são inteiramente adaptativos e dinâmicos, garantindo perfeita visualização tanto em modo janela quanto em tela cheia sem qualquer sobreposição de elementos:
+
+### 1. Painel Principal & Fluxo Editorial
+Acompanhamento em tempo real de progresso por segmento/capítulo, estimativa de tempo restante (ETA), monitoramento de memória/GPU e resumo diagnóstico da obra (personagens, gênero e total de palavras):
+
+![Fluxo Editorial e Diagnóstico do Translate Book CJrTools](docs/images/screenshot_main_window.png)
+
+### 2. Auditoria e Controle de Qualidade (QA Alerts)
+Tabela interativa de detecção de anomalias com filtros por severidade (*Crítico*, *Sugestão*, *Automático*), verificação de consistência de nomes canônicos e integridade de pontuação editorial:
+
+![Alertas de QA do Translate Book CJrTools](docs/images/screenshot_qa_alerts.png)
+
+### 3. Aba "Sobre" (Identidade Oficial CJRDOOM)
+Créditos autorais, versão de lançamento e logo oficial em alto contraste com badges técnicas de garantia de privacidade e arquitetura local:
+
+![Aba Sobre e Identidade CJRDOOM](docs/images/screenshot_about_dialog.png)
 
 ---
 
@@ -57,16 +78,17 @@ O aplicativo adapta-se automaticamente à capacidade do seu computador através 
 
 ## Instalação
 
-### Opção 1: Instalador Oficial para Windows (Recomendado para Usuários)
-1. Baixe o instalador `Translate_BooK_Setup_v1.0.0.exe` da aba [Releases](https://github.com/seu-usuario/Translate_BooK/releases).
-2. Execute o instalador. Não são necessários privilégios de Administrador (instalação por usuário em `%LOCALAPPDATA%\Programs\Translate_BooK`).
+### Opção 1: Instalador Oficial para Windows (Recomendado)
+1. Baixe o instalador oficial `Translate_Book_CJrTools_Setup_v1.0.0.exe` na aba [GitHub Releases](https://github.com/carlosjrgit/Translate_BooK/releases).
+2. Execute o instalador. Não são necessários privilégios de Administrador (instalação isolada em `%LOCALAPPDATA%\Programs\Translate_Book_CJrTools`).
 3. O executável é standalone e **não requer Python pré-instalado**.
-4. Inicie o Translate_BooK pelo atalho na Área de Trabalho ou Menu Iniciar.
+4. Inicie o **Translate Book CJrTools** diretamente pelo atalho na Área de Trabalho ou Menu Iniciar.
+5. *(Alternativa portátil)*: Também disponibilizamos o arquivo compactado `Translate_Book_CJrTools_v1.0.0_win64_portable.zip` para execução direta sem instalação.
 
-### Opção 2: Instalação para Desenvolvedores
+### Opção 2: Instalação a partir do Código-Fonte (Desenvolvedores)
 ```bash
 # 1. Clone o repositório
-git clone https://github.com/seu-usuario/Translate_BooK.git
+git clone https://github.com/carlosjrgit/Translate_BooK.git
 cd Translate_BooK
 
 # 2. Crie e ative um ambiente virtual
@@ -74,7 +96,7 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1  # Windows PowerShell
 # source .venv/bin/activate  # Linux/macOS
 
-# 3. Instale a aplicação em modo editável com ferramentas de teste
+# 3. Instale a aplicação em modo editável com ferramentas de desenvolvimento
 pip install -e .
 pip install pytest ruff pyinstaller
 ```
@@ -83,9 +105,9 @@ pip install pytest ruff pyinstaller
 
 ## Download dos Modelos de IA
 
-Para manter o instalador leve (~60 MB) e respeitar o limite de banda dos usuários:
-- **Nenhum peso de modelo de IA vem embutido no instalador ou repositório Git**.
-- Na primeira execução do programa, abra **Configurações** > **Gerenciador de Modelos**.
+Para manter o instalador extremamente enxuto (~60 MB) e respeitar o limite de banda:
+- **Nenhum peso de modelo de IA vem embutido no instalador ou no repositório Git**.
+- Na primeira execução do programa, acesse a aba **Modo Avançado** > **Gerenciador de Modelos**.
 - Escolha a versão desejada (ex: `madlad400-7b-mt-ct2-int8`) e clique em **Baixar**.
 - O download é realizado via conexão criptografada HTTPS direta e a integridade de cada arquivo é auditada via hash **SHA-256** antes da ativação.
 
@@ -93,27 +115,27 @@ Para manter o instalador leve (~60 MB) e respeitar o limite de banda dos usuári
 
 ## Privacidade e Processamento Local
 
-- **100% Offline**: Toda a tradução e armazenamento ocorrem no seu computador.
-- **Zero Telemetria**: Sem rastreamento de uso, sem contadores ocultos, sem envio de logs.
-- **Proteção de NDA**: O texto dos seus livros nunca trafega pela internet nem é compartilhado com terceiros.
-- **Logs Sanitizados**: O sistema sanitiza automaticamente caminhos de sistema e nomes de usuário nos arquivos de log.
-- Para instruções sobre como auditar o tráfego via firewall ou Wireshark, veja [Política de Privacidade](docs/PRIVACY.md).
+- **100% Offline**: Toda a tradução, inferência e armazenamento ocorrem exclusivamente no seu computador.
+- **Zero Telemetria**: Sem rastreamento de uso, sem contadores ocultos, sem envio de métricas ou dados analíticos.
+- **Proteção de NDA**: O conteúdo dos seus livros e documentos nunca trafega pela internet nem é compartilhado com terceiros.
+- **Logs Sanitizados**: O sistema sanitiza automaticamente caminhos de arquivos e nomes de usuário locais nos relatórios de log.
+- Para instruções sobre auditoria independente de tráfego de rede via firewall ou Wireshark, consulte nossa [Política de Privacidade](docs/PRIVACY.md).
 
 ---
 
 ## Como Utilizar
 
 ### Interface Gráfica (GUI)
-Para iniciar a interface visual moderna (baseada em PySide6 / Qt):
+Para iniciar a interface visual moderna:
 ```bash
 python -m book_translator.ui.app
-# ou, se instalado via instalador Windows, use o atalho da Área de Trabalho
+# ou utilize o atalho criado pelo instalador na Área de Trabalho
 ```
-1. **Novo Projeto**: Selecione o arquivo original (`.epub`, `.docx`, `.txt` ou `.pdf`) e o diretório de destino.
-2. **Revisão de Entidades**: Verifique os personagens e termos identificados na análise preliminar.
-3. **Tradução**: Acompanhe o progresso em tempo real com estatísticas de velocidade e parágrafos concluídos.
-4. **Editor & Revisão**: Navegue pelos alertas de QA (números divergentes, consistência terminológica) e edite diretamente o texto.
-5. **Exportação**: Exporte o livro final no formato de sua escolha.
+1. **1. Selecionar Arquivo**: Escolha o arquivo original (`.epub`, `.docx`, `.txt` ou `.pdf`) e o diretório de saída.
+2. **2. Analisar Obra**: Revise os personagens e termos identificados na análise preliminar.
+3. **3. Traduzir Obra**: Acompanhe o progresso em tempo real com estatísticas de velocidade, tempo restante e parágrafos traduzidos.
+4. **4. Revisar (QA)**: Inspecione os alertas e anomalias de QA e realize correções pontuais caso necessário.
+5. **5. Exportar**: Salve a obra traduzida no formato desejado (`.epub`, `.docx` ou `.txt`).
 
 ### Linha de Comando (CLI) & Diagnóstico
 ```bash
@@ -128,9 +150,9 @@ book-translator --input livro.epub --profile balanced --output ./saida/
 
 ## Limitações Conhecidas
 
-- **Layouts Complexos em PDF**: Revistas de múltiplas colunas ou quadrinhos possuem fluxo de leitura não linear e podem exigir revisão visual adicional.
-- **Pares de Idiomas**: O motor atual é estritamente calibrado e homologado para **Inglês (EN) → Português Brasileiro (PT-BR)**.
-- **Consumo de Memória**: O modelo 10B requer no mínimo 16 GB de RAM ou 8 GB de VRAM dedicados para manter fluidez operacional.
+- **Layouts Complexos em PDF**: Revistas de múltiplas colunas ou histórias em quadrinhos possuem fluxo de leitura não linear e podem exigir revisão visual adicional.
+- **Pares de Idiomas**: O motor neural está calibrado e homologado para **Inglês (EN) → Português Brasileiro (PT-BR)**.
+- **Consumo de Memória**: O perfil *Quality* (10B) requer no mínimo 16 GB de RAM ou 8 GB de VRAM dedicados para manter fluidez operacional.
 
 ---
 
@@ -138,9 +160,9 @@ book-translator --input livro.epub --profile balanced --output ./saida/
 
 Encontrou alguma dificuldade? Consulte o nosso guia completo de [Solução de Problemas e FAQ](docs/TROUBLESHOOTING.md), cobrindo:
 - Como resolver erros de *CUDA Out of Memory*;
-- Configuração do Tesseract OCR;
-- Recuperação de projetos após desligamento repentino;
-- Gestão de espaço em disco.
+- Configuração e verificação do Tesseract OCR;
+- Recuperação transacional de projetos após desligamento repentino;
+- Gestão de espaço em disco e limpeza de cache.
 
 ---
 
@@ -171,6 +193,12 @@ Este projeto faz uso e presta homenagem às seguintes tecnologias de código abe
 
 ---
 
-## Licença
+## Licença & Autoria
+
+**Translate Book CJrTools**  
+Version 1.0.0  
+
+Designed and developed by **CJRDOOM**  
+© 2026 Carlos Junior  
 
 Este projeto é distribuído sob os termos da licença **MIT**. Consulte o arquivo [LICENSE](LICENSE) para mais detalhes.

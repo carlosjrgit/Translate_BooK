@@ -22,6 +22,7 @@ src_dir = workspace_dir / "src"
 # Arquivos de dados obrigatórios (schemas SQL e migrations)
 datas = [
     (str(src_dir / "book_translator" / "database" / "sql"), "book_translator/database/sql"),
+    (str(src_dir / "book_translator" / "ui" / "assets"), "book_translator/ui/assets"),
 ]
 
 # Hidden imports necessários para PySide6, parsers e pipeline
@@ -102,7 +103,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Translate_BooK",
+    name="Translate_Book_CJrTools",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -122,5 +123,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="Translate_BooK",
+    name="Translate_Book_CJrTools",
 )

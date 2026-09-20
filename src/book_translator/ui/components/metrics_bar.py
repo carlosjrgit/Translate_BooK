@@ -13,6 +13,22 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from book_translator.ui.theme import (
+    COLOR_ACCENT,
+    COLOR_BACKGROUND,
+    COLOR_BORDER_STRONG,
+    COLOR_BORDER_SUBTLE,
+    COLOR_ERROR,
+    COLOR_SUCCESS,
+    COLOR_SURFACE_ACTIVE,
+    COLOR_SURFACE_ELEVATED,
+    COLOR_TEXT_PRIMARY,
+    COLOR_TEXT_SECONDARY,
+    COLOR_WARNING,
+    RADIUS_DEFAULT,
+    RADIUS_SECONDARY,
+)
+
 
 class MetricsBar(QWidget):
     """Componente que exibe fase, capítulo, segmento, barra de progresso, ETA e botões de controle."""
@@ -28,10 +44,10 @@ class MetricsBar(QWidget):
 
     def _setup_ui(self) -> None:
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(12, 12, 12, 12)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(8)
 
-        # Card container com estilo escuro e bordas suaves
+        # Card container técnico com estilo flat
         card = QFrame(self)
         card.setObjectName("metricsCard")
         card_layout = QVBoxLayout(card)
@@ -42,76 +58,76 @@ class MetricsBar(QWidget):
         top_row = QHBoxLayout()
         self.lbl_phase = QLabel("Fase: Aguardando início...", self)
         self.lbl_phase.setObjectName("phaseLabel")
-        self.lbl_phase.setStyleSheet("font-size: 14px; font-weight: bold; color: #89b4fa;")
+        self.lbl_phase.setStyleSheet(f"font-size: 14px; font-weight: 600; color: {COLOR_ACCENT};")
         top_row.addWidget(self.lbl_phase)
 
         top_row.addStretch()
 
         self.badge_errors = QLabel("Erros: 0", self)
         self.badge_errors.setStyleSheet(
-            "background-color: #313244; color: #f38ba8; padding: 4px 8px; border-radius: 6px; font-weight: bold;"
+            f"background-color: {COLOR_SURFACE_ACTIVE}; color: {COLOR_ERROR}; border: 1px solid {COLOR_BORDER_SUBTLE}; padding: 3px 8px; border-radius: {RADIUS_SECONDARY}; font-weight: 600;"
         )
         top_row.addWidget(self.badge_errors)
 
         self.badge_warnings = QLabel("Avisos: 0", self)
         self.badge_warnings.setStyleSheet(
-            "background-color: #313244; color: #f9e2af; padding: 4px 8px; border-radius: 6px; font-weight: bold;"
+            f"background-color: {COLOR_SURFACE_ACTIVE}; color: {COLOR_WARNING}; border: 1px solid {COLOR_BORDER_SUBTLE}; padding: 3px 8px; border-radius: {RADIUS_SECONDARY}; font-weight: 600;"
         )
         top_row.addWidget(self.badge_warnings)
 
         card_layout.addLayout(top_row)
 
-        # Linha 2: Barra de Progresso
+        # Linha 2: Barra de Progresso Flat e Geométrica
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                background-color: #181825;
-                border: 1px solid #313244;
-                border-radius: 8px;
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {COLOR_BACKGROUND};
+                border: 1px solid {COLOR_BORDER_SUBTLE};
+                border-radius: {RADIUS_SECONDARY};
                 text-align: center;
-                color: #cdd6f4;
-                font-weight: bold;
-                height: 22px;
-            }
-            QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #89b4fa, stop:1 #b4befe);
-                border-radius: 7px;
-            }
+                color: {COLOR_TEXT_PRIMARY};
+                font-weight: 600;
+                height: 18px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {COLOR_ACCENT};
+                border-radius: {RADIUS_SECONDARY};
+            }}
         """)
         card_layout.addWidget(self.progress_bar)
 
-        # Linha 3: Capítulo e Segmento
+        # Linha 3: Informações de Capítulo e Segmento
         mid_row = QHBoxLayout()
         self.lbl_chapter = QLabel("Capítulo: —", self)
-        self.lbl_chapter.setStyleSheet("color: #bac2de; font-size: 13px;")
+        self.lbl_chapter.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 13px;")
         mid_row.addWidget(self.lbl_chapter)
 
         mid_row.addStretch()
 
         self.lbl_segment = QLabel("Segmento: —", self)
-        self.lbl_segment.setStyleSheet("color: #bac2de; font-size: 13px;")
+        self.lbl_segment.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 13px;")
         mid_row.addWidget(self.lbl_segment)
         card_layout.addLayout(mid_row)
 
         # Linha 4: Métricas Temporais, Modelo e Controles
         bottom_row = QHBoxLayout()
         self.lbl_elapsed = QLabel("Tempo decorrido: 00:00", self)
-        self.lbl_elapsed.setStyleSheet("color: #a6adc8; font-size: 12px;")
+        self.lbl_elapsed.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 12px;")
         bottom_row.addWidget(self.lbl_elapsed)
 
         bottom_row.addSpacing(16)
 
         self.lbl_eta = QLabel("Estimativa restante: Calculando...", self)
-        self.lbl_eta.setStyleSheet("color: #a6adc8; font-size: 12px;")
+        self.lbl_eta.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 12px;")
         bottom_row.addWidget(self.lbl_eta)
 
         bottom_row.addSpacing(16)
 
         self.lbl_model_usage = QLabel("Modelo: Aguardando", self)
-        self.lbl_model_usage.setStyleSheet("color: #a6adc8; font-size: 12px;")
+        self.lbl_model_usage.setStyleSheet(f"color: {COLOR_TEXT_SECONDARY}; font-size: 12px;")
         bottom_row.addWidget(self.lbl_model_usage)
 
         bottom_row.addStretch()
@@ -119,17 +135,20 @@ class MetricsBar(QWidget):
         # Botão Pausar/Continuar
         self.btn_pause = QPushButton("Pausar", self)
         self.btn_pause.setFixedWidth(90)
-        self.btn_pause.setStyleSheet("""
-            QPushButton {
-                background-color: #fab387;
-                color: #11111b;
-                font-weight: bold;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover {
-                background-color: #f9e2af;
-            }
+        self.btn_pause.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_SURFACE_ELEVATED};
+                color: {COLOR_TEXT_PRIMARY};
+                font-weight: 500;
+                border: 1px solid {COLOR_BORDER_SUBTLE};
+                border-radius: {RADIUS_DEFAULT};
+                padding: 4px 10px;
+                min-height: 22px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_SURFACE_ACTIVE};
+                border: 1px solid {COLOR_BORDER_STRONG};
+            }}
         """)
         self.btn_pause.clicked.connect(self._toggle_pause)
         bottom_row.addWidget(self.btn_pause)
@@ -137,17 +156,20 @@ class MetricsBar(QWidget):
         # Botão Cancelar
         self.btn_cancel = QPushButton("Cancelar", self)
         self.btn_cancel.setFixedWidth(90)
-        self.btn_cancel.setStyleSheet("""
-            QPushButton {
-                background-color: #f38ba8;
-                color: #11111b;
-                font-weight: bold;
-                border-radius: 6px;
-                padding: 6px 12px;
-            }
-            QPushButton:hover {
-                background-color: #eba0ac;
-            }
+        self.btn_cancel.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLOR_SURFACE_ELEVATED};
+                color: {COLOR_ERROR};
+                font-weight: 500;
+                border: 1px solid {COLOR_BORDER_SUBTLE};
+                border-radius: {RADIUS_DEFAULT};
+                padding: 4px 10px;
+                min-height: 22px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLOR_SURFACE_ACTIVE};
+                border: 1px solid {COLOR_ERROR};
+            }}
         """)
         self.btn_cancel.clicked.connect(self.sig_cancel_clicked.emit)
         bottom_row.addWidget(self.btn_cancel)
@@ -159,27 +181,31 @@ class MetricsBar(QWidget):
         if not self._is_paused:
             self._is_paused = True
             self.btn_pause.setText("Retomar")
-            self.btn_pause.setStyleSheet("""
-                QPushButton {
-                    background-color: #a6e3a1;
-                    color: #11111b;
-                    font-weight: bold;
-                    border-radius: 6px;
-                    padding: 6px 12px;
-                }
+            self.btn_pause.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLOR_SURFACE_ELEVATED};
+                    color: {COLOR_SUCCESS};
+                    font-weight: 600;
+                    border: 1px solid {COLOR_SUCCESS};
+                    border-radius: {RADIUS_DEFAULT};
+                    padding: 4px 10px;
+                    min-height: 22px;
+                }}
             """)
             self.sig_pause_clicked.emit()
         else:
             self._is_paused = False
             self.btn_pause.setText("Pausar")
-            self.btn_pause.setStyleSheet("""
-                QPushButton {
-                    background-color: #fab387;
-                    color: #11111b;
-                    font-weight: bold;
-                    border-radius: 6px;
-                    padding: 6px 12px;
-                }
+            self.btn_pause.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLOR_SURFACE_ELEVATED};
+                    color: {COLOR_TEXT_PRIMARY};
+                    font-weight: 500;
+                    border: 1px solid {COLOR_BORDER_SUBTLE};
+                    border-radius: {RADIUS_DEFAULT};
+                    padding: 4px 10px;
+                    min-height: 22px;
+                }}
             """)
             self.sig_resume_clicked.emit()
 

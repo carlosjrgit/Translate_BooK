@@ -19,13 +19,13 @@ param (
 $ErrorActionPreference = "Stop"
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "   Translate_BooK - Pipeline de Empacotamento Windows       " -ForegroundColor Cyan
+Write-Host "   Translate Book CJrTools - Pipeline de Empacotamento      " -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 $WorkspaceRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $WorkspaceRoot
 
-$DistDir = Join-Path $WorkspaceRoot "dist\Translate_BooK"
+$DistDir = Join-Path $WorkspaceRoot "dist\Translate_Book_CJrTools"
 $InstallerOutDir = Join-Path $WorkspaceRoot "dist_installer"
 $SpecFile = Join-Path $PSScriptRoot "translate_book.spec"
 $IssFile = Join-Path $PSScriptRoot "installer.iss"
@@ -40,8 +40,8 @@ if (-not (Test-Path $InstallerOutDir)) { New-Item -ItemType Directory -Path $Ins
 Write-Host "`n[2/4] Executando PyInstaller com $SpecFile..." -ForegroundColor Yellow
 python -m PyInstaller --clean --noconfirm "$SpecFile"
 
-if (-not (Test-Path "$DistDir\Translate_BooK.exe")) {
-    Write-Error "Falha ao gerar o executável Translate_BooK.exe!"
+if (-not (Test-Path "$DistDir\Translate_Book_CJrTools.exe")) {
+    Write-Error "Falha ao gerar o executável Translate_Book_CJrTools.exe!"
     exit 1
 }
 Write-Host "  -> Binário standalone gerado com sucesso em: $DistDir" -ForegroundColor Green

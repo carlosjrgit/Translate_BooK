@@ -56,11 +56,11 @@ def sample_document() -> Document:
 def test_main_window_initial_state(qapp):
     """Verifica a inicialização da MainWindow e o estado padrão dos componentes."""
     window = MainWindow()
-    assert window.windowTitle().startswith("Translate_BooK")
+    assert window.windowTitle().startswith("Translate Book CJrTools")
     assert window.hardware_profile is not None
     assert window.btn_select_file.isEnabled() is True
     assert window.btn_translate.isEnabled() is False  # Desabilitado até carregar obra
-    assert window.tabs.count() == 2  # Fluxo Editorial e Modo Avançado
+    assert window.tabs.count() == 3  # Fluxo Editorial, Modo Avançado e Sobre
 
 
 def test_metrics_bar_updates_and_signals(qapp):

@@ -107,13 +107,13 @@ class QAAlertsWidget(QWidget):
             sev = item.get("severity", "")
             if sev == "review_required":
                 sev_label = "Crítico (Revisar)"
-                color = QColor("#f38ba8")
+                color = QColor("#F44336")
             elif sev == "suggested_fix":
                 sev_label = "Sugestão"
-                color = QColor("#f9e2af")
+                color = QColor("#FFC107")
             else:
                 sev_label = "Automático"
-                color = QColor("#a6e3a1")
+                color = QColor("#4CAF50")
 
             it_sev = QTableWidgetItem(sev_label)
             it_sev.setForeground(color)
@@ -136,7 +136,7 @@ class QAAlertsWidget(QWidget):
         displayed = len(filtered)
         if total == 0:
             self.lbl_count.setText("Nenhum alerta encontrado. Qualidade 100% aprovada!")
-            self.lbl_count.setStyleSheet("color: #a6e3a1; font-weight: bold;")
+            self.lbl_count.setStyleSheet("color: #4CAF50; font-weight: 600;")
         else:
             self.lbl_count.setText(f"Exibindo {displayed} de {total} alertas.")
-            self.lbl_count.setStyleSheet("color: #f9e2af; font-weight: bold;")
+            self.lbl_count.setStyleSheet("color: #FFC107; font-weight: 600;")

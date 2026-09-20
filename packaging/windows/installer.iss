@@ -17,23 +17,23 @@
 ;    - Todos os identificadores de diretório e executáveis são devidamente envolvidos em aspas.
 ; =====================================================================
 
-#define MyAppName "Translate_BooK"
+#define MyAppName "Translate Book CJrTools"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "Translate_BooK Community"
-#define MyAppExeName "Translate_BooK.exe"
+#define MyAppPublisher "CJRDOOM"
+#define MyAppExeName "Translate_Book_CJrTools.exe"
 
 [Setup]
 AppId={{8B1A2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5D}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\Programs\{#MyAppName}
+DefaultDirName={localappdata}\Programs\Translate_Book_CJrTools
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\..\dist_installer
-OutputBaseFilename=Translate_BooK_Setup_v{#MyAppVersion}
+OutputBaseFilename=Translate_Book_CJrTools_Setup_v{#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -51,7 +51,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Binários e dependências gerados pelo PyInstaller (sem pesos neurais embutidos)
-Source: "..\..\dist\Translate_BooK\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\dist\Translate_Book_CJrTools\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

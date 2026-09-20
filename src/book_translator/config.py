@@ -56,8 +56,15 @@ def get_default_data_dirs() -> DataDirs:
         appdata = os.environ.get("APPDATA")
         localappdata = os.environ.get("LOCALAPPDATA")
         if appdata and localappdata:
-            roaming = Path(appdata) / "Translate_BooK"
-            local = Path(localappdata) / "Translate_BooK"
+            # Novo diretório oficial com compatibilidade transparente a versões anteriores
+            roaming = Path(appdata) / "Translate_Book_CJrTools"
+            if not roaming.exists() and (Path(appdata) / "Translate_BooK").exists():
+                roaming = Path(appdata) / "Translate_BooK"
+
+            local = Path(localappdata) / "Translate_Book_CJrTools"
+            if not local.exists() and (Path(localappdata) / "Translate_BooK").exists():
+                local = Path(localappdata) / "Translate_BooK"
+
             return DataDirs(
                 projects_dir=roaming / "projects",
                 models_dir=local / "models",
