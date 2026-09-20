@@ -60,12 +60,33 @@ Desktop.ini
 *.onnx
 models/downloads/
 models/weights/
+.models/
+*.part
 
 # Application runtime data & Project databases
 projects/
+.projects/
 cache/
+.cache/
 logs/
 output/
 *.sqlite
 *.sqlite3
 *.db
+*.log
+
+# Windows Executables & Installers
+*.exe
+*.msi
+*.dll
+dist_installer/
+installer/dist/
+installer/build/
+packaging/dist/
+packaging/build/
+
+# Temporary & Scratch files
+**/scratch*/
+scratch/
+tmp/
+temp/

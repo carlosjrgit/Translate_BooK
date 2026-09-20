@@ -6,13 +6,13 @@ import pytest
 
 from book_translator.core.models import Project, ProjectMetadata
 from book_translator.database.sqlite import SQLiteDatabase
-from book_translator.memory.manager import MemoryManager
-from book_translator.memory.models import (
+from book_translator.memory import (
     CharacterEntry,
     GlossaryEntry,
     StyleBible,
     TranslationMemoryEntry,
 )
+from book_translator.memory.manager import MemoryManager
 
 
 @pytest.fixture

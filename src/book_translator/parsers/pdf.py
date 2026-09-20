@@ -7,6 +7,7 @@ import unicodedata
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import pypdf
 
@@ -82,18 +83,25 @@ DEHYPHENATION_REGEX = re.compile(r"(\b[a-zA-ZÀ-ÿ]+)[-\xad]\s*\n\s*([a-zà-ÿ]+
 class PdfParser(BaseParser):
     """Parser para arquivos PDF com camada textual e detecção de documentos escaneados."""
 
-    def __init__(self, config: PdfParserConfig | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        config: PdfParserConfig | None = None,
+        ocr_service: Any | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self.config = config or PdfParserConfig()
+        self.ocr_service = ocr_service
 
     @property
     def supported_extensions(self) -> tuple[str, ...]:
         return (".pdf",)
 
     def parse(self, file_path: Path | str, title: str | None = None) -> Document:
-        """Executa a extração estruturada de um PDF com camada textual.
+        """Executa a extração estruturada de um PDF com camada textual ou OCR opcional.
 
-        Lança NeedsOcrError caso o PDF seja classificado como SCANNED_NEEDS_OCR.
+        Lança NeedsOcrError caso o PDF seja classificado como SCANNED_NEEDS_OCR e nenhum
+        serviço de OCR tenha sido fornecido.
         """
         path = self.validate_source_file(file_path)
         logger.info(f"Iniciando análise de PDF: '{path.name}'")
@@ -116,23 +124,86 @@ class PdfParser(BaseParser):
                     f"({diagnostics['good_pages']}/{num_pages} páginas textuais)"
                 )
 
-                if classification == PdfClassification.SCANNED_NEEDS_OCR:
-                    raise NeedsOcrError(
-                        f"O arquivo PDF '{path.name}' não possui camada de texto utilizável "
-                        f"(classificação: {classification.value}). Requer OCR para processamento."
-                    )
-
-                # 2. Extração bruta de texto por página
+                pages_ocr_info: dict[int, dict[str, Any]] = {}
                 raw_pages: list[list[str]] = []
-                for p_idx, page in enumerate(reader.pages):
-                    try:
-                        p_text = page.extract_text() or ""
-                    except Exception as e:
-                        logger.warning(f"Erro ao extrair texto da página {p_idx + 1}: {e}")
-                        p_text = ""
-                    p_text = normalize_unicode(p_text)
-                    lines = [line.strip() for line in p_text.splitlines() if line.strip()]
-                    raw_pages.append(lines)
+
+                if classification == PdfClassification.TEXTUAL:
+                    # REGRA: Nunca rodar OCR em PDF textual válido
+                    logger.debug("PDF 100% textual. Extração direta sem OCR.")
+                    for p_idx, page in enumerate(reader.pages):
+                        page_num = p_idx + 1
+                        try:
+                            p_text = page.extract_text() or ""
+                        except Exception as e:
+                            logger.warning(f"Erro ao extrair texto da página {page_num}: {e}")
+                            p_text = ""
+                        p_text = normalize_unicode(p_text)
+                        lines = [line.strip() for line in p_text.splitlines() if line.strip()]
+                        raw_pages.append(lines)
+                        pages_ocr_info[page_num] = {"is_ocr": False}
+
+                elif classification == PdfClassification.SCANNED_NEEDS_OCR:
+                    if self.ocr_service is None:
+                        raise NeedsOcrError(
+                            f"O arquivo PDF '{path.name}' não possui camada de texto utilizável "
+                            f"(classificação: {classification.value}). Requer OCR para processamento."
+                        )
+                    logger.info(f"Acionando OCR para PDF escaneado '{path.name}' ({num_pages} páginas)...")
+                    ocr_doc = self.ocr_service.process_scanned_pdf(
+                        path, page_numbers=list(range(1, num_pages + 1))
+                    )
+                    for page_res in ocr_doc.pages:
+                        p_num = page_res.page_number
+                        p_text = normalize_unicode(page_res.text)
+                        lines = [line.strip() for line in p_text.splitlines() if line.strip()]
+                        raw_pages.append(lines)
+                        pages_ocr_info[p_num] = {
+                            "is_ocr": True,
+                            "ocr_confidence": page_res.confidence,
+                            "ocr_engine": page_res.engine_name,
+                            "needs_review": page_res.needs_review,
+                            "page_number": p_num,
+                        }
+
+                elif classification == PdfClassification.MIXED:
+                    logger.info(f"Processando PDF misto '{path.name}'...")
+                    for p_idx, page in enumerate(reader.pages):
+                        page_num = p_idx + 1
+                        try:
+                            p_text = page.extract_text() or ""
+                        except Exception:
+                            p_text = ""
+                        p_text_norm = normalize_unicode(p_text).strip()
+
+                        # Verifica se esta página específica necessita de OCR
+                        char_count = len(p_text_norm)
+                        printable_count = sum(
+                            1 for c in p_text_norm
+                            if not unicodedata.category(c).startswith("C") and c != "\ufffd"
+                        )
+                        ratio = printable_count / char_count if char_count > 0 else 0.0
+
+                        is_page_scanned = (
+                            char_count < self.config.min_page_char_count
+                            or ratio < self.config.min_printable_ratio
+                        )
+
+                        if is_page_scanned and self.ocr_service is not None:
+                            logger.info(f"Página {page_num} com baixa qualidade textual. Aplicando OCR...")
+                            ocr_res, _ = self.ocr_service.process_page_with_cache(path, page_num)
+                            p_text_norm = normalize_unicode(ocr_res.text).strip()
+                            pages_ocr_info[page_num] = {
+                                "is_ocr": True,
+                                "ocr_confidence": ocr_res.confidence,
+                                "ocr_engine": ocr_res.engine_name,
+                                "needs_review": ocr_res.needs_review,
+                                "page_number": page_num,
+                            }
+                        else:
+                            pages_ocr_info[page_num] = {"is_ocr": False, "page_number": page_num}
+
+                        lines = [line.strip() for line in p_text_norm.splitlines() if line.strip()]
+                        raw_pages.append(lines)
 
                 # 3. Aplicação de heurísticas de limpeza (cabeçalhos, rodapés, paginação)
                 cleaned_pages = self._clean_pages(raw_pages)
@@ -154,9 +225,19 @@ class PdfParser(BaseParser):
                 )
                 doc.metadata.extra["pdf_classification"] = classification.value
                 doc.metadata.extra["pdf_diagnostics"] = diagnostics
+                doc.metadata.extra["is_ocr"] = any(info.get("is_ocr") for info in pages_ocr_info.values())
+                ocr_scores = [
+                    info["ocr_confidence"]
+                    for info in pages_ocr_info.values()
+                    if info.get("ocr_confidence") is not None
+                ]
+                if ocr_scores:
+                    doc.metadata.extra["ocr_mean_confidence"] = round(sum(ocr_scores) / len(ocr_scores), 4)
 
                 # 5. Reconstrução de blocos, headings e capítulos
-                chapters = self._reconstruct_document_structure(cleaned_pages, doc.id, path)
+                chapters = self._reconstruct_document_structure(
+                    cleaned_pages, doc.id, path, pages_ocr_info=pages_ocr_info
+                )
                 if not chapters:
                     raise ParsingError(
                         f"Não foi possível extrair nenhum bloco de leitura do PDF '{path.name}'."
@@ -168,6 +249,7 @@ class PdfParser(BaseParser):
                     f"{sum(len(c.paragraphs) for c in chapters)} parágrafos."
                 )
                 return doc
+
 
         except NeedsOcrError:
             raise
@@ -336,11 +418,13 @@ class PdfParser(BaseParser):
         cleaned_pages: list[list[str]],
         doc_id: str,
         file_path: Path,
+        pages_ocr_info: dict[int, dict[str, Any]] | None = None,
     ) -> list[Chapter]:
         """Reconstrói blocos de leitura, headings e capítulos a partir das páginas limpas."""
         chapters: list[Chapter] = []
         ch_counter = 1
         reading_order = 1
+        ocr_info_map = pages_ocr_info or {}
 
         curr_ch_id = generate_chapter_id(doc_id, ch_counter)
         curr_chapter = Chapter(
@@ -355,6 +439,8 @@ class PdfParser(BaseParser):
             page_num = p_idx + 1
             if not raw_lines:
                 continue
+
+            page_ocr_meta = dict(ocr_info_map.get(page_num, {"is_ocr": False, "page_number": page_num}))
 
             # Heurística: Desifenização entre linhas consecutivas
             lines: list[str] = []
@@ -408,6 +494,7 @@ class PdfParser(BaseParser):
                             page_number=page_num,
                             line_number=pending_line_num,
                         ),
+                        metadata=dict(page_ocr_meta),
                     )
                 )
                 reading_order += 1
@@ -461,6 +548,7 @@ class PdfParser(BaseParser):
                                 page_number=page_num,
                                 line_number=line_idx + 1,
                             ),
+                            metadata=dict(page_ocr_meta),
                         )
                     )
                     reading_order += 1
@@ -486,10 +574,12 @@ class PdfParser(BaseParser):
                                 page_number=page_num,
                                 line_number=line_idx + 1,
                             ),
+                            metadata=dict(page_ocr_meta),
                         )
                     )
                     reading_order += 1
                     continue
+
 
                 # 3. Linha de parágrafo comum
                 if not pending_para_lines:

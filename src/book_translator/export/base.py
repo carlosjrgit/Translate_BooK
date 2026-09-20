@@ -15,7 +15,11 @@ class ExportOptions:
 
     preserve_formatting: bool = True
     include_translator_preface: bool = False
+    include_metadata: bool = True
+    include_footnotes: bool = True
     target_encoding: str = "utf-8"
+    custom_title: str | None = None
+    custom_author: str | None = None
     extra_options: dict[str, Any] = field(default_factory=dict)
 
 

@@ -16,7 +16,8 @@ from book_translator.analysis.ner.interface import RawEntityMention
 class AliasResolver:
     """Consolida menções variantes em entidades canônicas ou as marca como ambíguas."""
 
-    def __init__(self) -> None:
+    def __init__(self, id_prefix: str = "") -> None:
+        self.id_prefix = id_prefix
         self._entity_counter = 1
 
     def _generate_entity_id(self, entity_type: EntityType) -> str:
@@ -25,7 +26,8 @@ class AliasResolver:
             EntityType.LOCATION: "loc",
             EntityType.ORGANIZATION: "org",
         }.get(entity_type, "ent")
-        eid = f"{prefix}_{self._entity_counter:04d}"
+        scoped = f"{self.id_prefix}_{prefix}" if self.id_prefix else prefix
+        eid = f"{scoped}_{self._entity_counter:04d}"
         self._entity_counter += 1
         return eid
 

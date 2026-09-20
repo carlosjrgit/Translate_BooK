@@ -19,10 +19,12 @@ from book_translator.core.models import (
 from book_translator.memory.base import (
     CharacterEntry,
     GlossaryEntry,
+    StoryMemory,
+    StoryRelationship,
     StyleBible,
     TranslationMemoryEntry,
 )
-from book_translator.qa.base import QAReport
+from book_translator.qa.base import QAFixAuditRecord, QAIssue, QAReport
 from book_translator.translation.base import TranslationDraft
 
 
@@ -129,6 +131,24 @@ class DatabaseInterface(Protocol):
         """Recupera a Style Bible do projeto."""
         ...
 
+    def save_story_memory(self, project_id: str, story_memory: StoryMemory) -> None:
+        """Salva a memória narrativa/contextual completa do projeto."""
+        ...
+
+    def get_story_memory(self, project_id: str) -> StoryMemory:
+        """Recupera a memória narrativa/contextual completa do projeto."""
+        ...
+
+    def save_story_relationship(self, project_id: str, relationship: StoryRelationship) -> None:
+        """Salva ou atualiza uma relação interpessoal ativa da história."""
+        ...
+
+    def get_story_relationships(
+        self, project_id: str, character_id: str | None = None
+    ) -> list[StoryRelationship]:
+        """Recupera as relações interpessoais da história cadastradas no projeto."""
+        ...
+
     def record_memory_audit(
         self,
         project_id: str,
@@ -166,6 +186,38 @@ class DatabaseInterface(Protocol):
         """Salva rascunho de tradução e suas hipóteses candidatas."""
         ...
 
+    def get_translations(self, segment_id: str) -> list[dict[str, Any]]:
+        """Recupera todas as hipóteses de tradução de um segmento ordenadas por rank."""
+        ...
+
+    def get_selected_translation(self, segment_id: str) -> dict[str, Any] | None:
+        """Recupera a tradução ativa/selecionada de um segmento."""
+        ...
+
+    def save_translation_cache(
+        self,
+        cache_key: str,
+        project_id: str,
+        segment_id: str,
+        source_text: str,
+        target_text: str,
+        model_name: str,
+        runtime: str,
+        parameters: dict[str, Any],
+        context_hash: str,
+        glossary_terms: list[str] | None = None,
+    ) -> None:
+        """Persiste uma entrada no cache determinístico de traduções."""
+        ...
+
+    def get_translation_cache(self, cache_key: str) -> dict[str, Any] | None:
+        """Recupera uma entrada do cache de traduções pelo hash canônico da chave."""
+        ...
+
+    def invalidate_cache_by_glossary_term(self, project_id: str, glossary_term: str) -> list[str]:
+        """Invalida o cache e reverte para pending apenas os segmentos afetados pelo termo de glossário."""
+        ...
+
     def save_revision(
         self,
         segment_id: str,
@@ -180,6 +232,18 @@ class DatabaseInterface(Protocol):
     # QA e Validação
     def save_qa_report(self, report: QAReport) -> None:
         """Salva as anomalias e o relatório de QA de um segmento."""
+        ...
+
+    def get_qa_issues(self, segment_id: str) -> list[QAIssue]:
+        """Recupera anomalias de QA registradas para um segmento."""
+        ...
+
+    def save_qa_fix_audit(self, audit: QAFixAuditRecord) -> None:
+        """Salva o registro de auditoria de correção automática determinística."""
+        ...
+
+    def get_qa_fix_audits(self, segment_id: str) -> list[QAFixAuditRecord]:
+        """Recupera a trilha de auditoria de correções aplicadas a um segmento."""
         ...
 
     # Checkpoints e Eventos

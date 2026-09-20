@@ -170,23 +170,6 @@ class TranslationMemoryEntry:
 
 
 @dataclass
-class StyleBible:
-    """Manual de estilo e diretrizes editoriais da obra."""
-
-    narrator: str = "terceira pessoa"
-    register: str = "literário contemporâneo"
-    dialogue_style: str = "natural em PT-BR"
-    profanity_handling: str = "preservar intensidade do original"
-    predominant_treatment: str = "você"
-    punctuation_standard: str = "editorial brasileiro"
-    project_id: Any = ""
-    tone: str = "literário"
-    formality_level: str = "formal"
-    custom_rules: dict[str, Any] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
 class ConflictReport:
     """Relatório detalhado de conflito ou colisão de tradução/aliases."""
 

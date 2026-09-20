@@ -1,0 +1,360 @@
+{
+  "summary": {
+    "total_samples": 24,
+    "multi_signal": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "false_positive_rate": 0.0,
+      "true_positives": 16,
+      "false_positives": 0,
+      "true_negatives": 8,
+      "false_negatives": 0,
+      "category_recall": {
+        "omission": 1.0,
+        "addition": 1.0,
+        "meaning_reversal": 1.0,
+        "subject_shift": 1.0,
+        "intensity_loss": 1.0,
+        "problematic_literal": 1.0
+      }
+    },
+    "embedding_only_baseline": {
+      "precision": 1.0,
+      "recall": 0.0625,
+      "f1_score": 0.1176,
+      "false_positive_rate": 0.0,
+      "true_positives": 1,
+      "false_positives": 0,
+      "true_negatives": 8,
+      "false_negatives": 15
+    },
+    "comparative_advantage": {
+      "f1_gain": 0.8824,
+      "recall_gain": 0.9375,
+      "conclusion": "A abordagem multi-sinal supera significativamente a similaridade vetorial isolada, detectando inversões de sentido, perdas de intensidade e falsos cognatos que embeddings de cosseno não conseguem distinguir semânticamente."
+    }
+  },
+  "details": [
+    {
+      "id": "valid_01",
+      "category": "valid_translation",
+      "overall_score": 0.9896,
+      "embedding_similarity": 0.9583269473584655,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.96)."
+      ]
+    },
+    {
+      "id": "valid_02",
+      "category": "valid_translation",
+      "overall_score": 0.9539,
+      "embedding_similarity": 0.815599910594,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.82)."
+      ]
+    },
+    {
+      "id": "valid_03",
+      "category": "valid_translation",
+      "overall_score": 0.9516,
+      "embedding_similarity": 0.8063190486717817,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.81)."
+      ]
+    },
+    {
+      "id": "valid_04",
+      "category": "valid_translation",
+      "overall_score": 0.9663,
+      "embedding_similarity": 0.8650524785202165,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.87)."
+      ]
+    },
+    {
+      "id": "valid_05",
+      "category": "valid_translation",
+      "overall_score": 0.9676,
+      "embedding_similarity": 0.8705608218120562,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.87)."
+      ]
+    },
+    {
+      "id": "valid_06",
+      "category": "valid_translation",
+      "overall_score": 0.9753,
+      "embedding_similarity": 0.9010706574865455,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.90)."
+      ]
+    },
+    {
+      "id": "valid_07",
+      "category": "valid_translation",
+      "overall_score": 0.9683,
+      "embedding_similarity": 0.8732046358572995,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.87)."
+      ]
+    },
+    {
+      "id": "valid_08",
+      "category": "valid_translation",
+      "overall_score": 0.9908,
+      "embedding_similarity": 0.9630564527914438,
+      "expected_issue": null,
+      "detected_issues": [],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.96)."
+      ]
+    },
+    {
+      "id": "omission_01",
+      "category": "omission",
+      "overall_score": 0.8103,
+      "embedding_similarity": 0.6013854587267562,
+      "expected_issue": "semantic_omission",
+      "detected_issues": [
+        "semantic_omission"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.60)."
+      ]
+    },
+    {
+      "id": "omission_02",
+      "category": "omission",
+      "overall_score": 0.8248,
+      "embedding_similarity": 0.6593104804948193,
+      "expected_issue": "semantic_omission",
+      "detected_issues": [
+        "semantic_omission"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.66)."
+      ]
+    },
+    {
+      "id": "addition_01",
+      "category": "addition",
+      "overall_score": 0.8766,
+      "embedding_similarity": 0.8064018716346047,
+      "expected_issue": "semantic_addition",
+      "detected_issues": [
+        "semantic_addition"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.81)."
+      ]
+    },
+    {
+      "id": "meaning_reversal_01",
+      "category": "meaning_reversal",
+      "overall_score": 0.7752,
+      "embedding_similarity": 0.7406457796315833,
+      "expected_issue": "meaning_reversal",
+      "detected_issues": [
+        "meaning_reversal"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.74)."
+      ]
+    },
+    {
+      "id": "meaning_reversal_02",
+      "category": "meaning_reversal",
+      "overall_score": 0.7975,
+      "embedding_similarity": 0.8300798312173095,
+      "expected_issue": "meaning_reversal",
+      "detected_issues": [
+        "meaning_reversal"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.83)."
+      ]
+    },
+    {
+      "id": "polarity_inversion_01",
+      "category": "meaning_reversal",
+      "overall_score": 0.8115,
+      "embedding_similarity": 0.8059863431034815,
+      "expected_issue": "polarity_inversion",
+      "detected_issues": [
+        "polarity_inversion"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.81)."
+      ]
+    },
+    {
+      "id": "polarity_inversion_02",
+      "category": "meaning_reversal",
+      "overall_score": 0.7935,
+      "embedding_similarity": 0.7340879885460446,
+      "expected_issue": "polarity_inversion",
+      "detected_issues": [
+        "polarity_inversion"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.73)."
+      ]
+    },
+    {
+      "id": "subject_shift_01",
+      "category": "subject_shift",
+      "overall_score": 0.8427,
+      "embedding_similarity": 0.9307081150541443,
+      "expected_issue": "subject_shift",
+      "detected_issues": [
+        "subject_shift"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.93)."
+      ]
+    },
+    {
+      "id": "subject_shift_02",
+      "category": "subject_shift",
+      "overall_score": 0.8116,
+      "embedding_similarity": 0.7262730392025628,
+      "expected_issue": "subject_shift",
+      "detected_issues": [
+        "subject_shift"
+      ],
+      "passed": false,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.73)."
+      ]
+    },
+    {
+      "id": "intensity_loss_01",
+      "category": "intensity_loss",
+      "overall_score": 0.9273,
+      "embedding_similarity": 0.8691918692063942,
+      "expected_issue": "intensity_loss",
+      "detected_issues": [
+        "intensity_loss"
+      ],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.87)."
+      ]
+    },
+    {
+      "id": "intensity_loss_02",
+      "category": "intensity_loss",
+      "overall_score": 0.9039,
+      "embedding_similarity": 0.7757196372875577,
+      "expected_issue": "intensity_loss",
+      "detected_issues": [
+        "intensity_loss"
+      ],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.78)."
+      ]
+    },
+    {
+      "id": "intensity_loss_03",
+      "category": "intensity_loss",
+      "overall_score": 0.9131,
+      "embedding_similarity": 0.8122414760550402,
+      "expected_issue": "intensity_loss",
+      "detected_issues": [
+        "intensity_loss"
+      ],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.81)."
+      ]
+    },
+    {
+      "id": "problematic_literal_01",
+      "category": "problematic_literal",
+      "overall_score": 0.9157,
+      "embedding_similarity": 0.8626516513154834,
+      "expected_issue": "problematic_literal_translation",
+      "detected_issues": [
+        "problematic_literal_translation"
+      ],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.86)."
+      ]
+    },
+    {
+      "id": "problematic_literal_02",
+      "category": "problematic_literal",
+      "overall_score": 0.8964,
+      "embedding_similarity": 0.785749084013868,
+      "expected_issue": "problematic_literal_translation",
+      "detected_issues": [
+        "problematic_literal_translation"
+      ],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.79)."
+      ]
+    },
+    {
+      "id": "problematic_literal_03",
+      "category": "problematic_literal",
+      "overall_score": 0.9337,
+      "embedding_similarity": 0.9348801357687854,
+      "expected_issue": "problematic_literal_translation",
+      "detected_issues": [
+        "problematic_literal_translation"
+      ],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.93)."
+      ]
+    },
+    {
+      "id": "problematic_literal_04",
+      "category": "problematic_literal",
+      "overall_score": 0.9154,
+      "embedding_similarity": 0.8614538020763663,
+      "expected_issue": "problematic_literal_translation",
+      "detected_issues": [
+        "problematic_literal_translation"
+      ],
+      "passed": true,
+      "justifications": [
+        "Similaridade de embedding satisfatória (score=0.86)."
+      ]
+    }
+  ]
+}

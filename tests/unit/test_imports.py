@@ -33,6 +33,8 @@ MODULES = [
     "book_translator.memory.glossary",
     "book_translator.memory.translation_memory",
     "book_translator.memory.manager",
+    "book_translator.memory.style_bible",
+    "book_translator.memory.story_memory",
     "book_translator.context",
     "book_translator.context.base",
     "book_translator.translation",

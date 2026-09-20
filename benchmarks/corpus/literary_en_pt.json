@@ -1,0 +1,122 @@
+[
+  {
+    "id": "corpus_01",
+    "category": "dialogue_formal",
+    "source": "'It has long been an axiom of mine that the little things are infinitely the most important,' remarked Holmes.",
+    "reference": "— Há muito tempo é um axioma meu que as pequenas coisas são infinitamente as mais importantes — comentou Holmes."
+  },
+  {
+    "id": "corpus_02",
+    "category": "dialogue_colloquial",
+    "source": "'Nonsense, my dear fellow! You are looking at the matter from entirely the wrong angle,' he laughed.",
+    "reference": "— Bobagem, meu caro amigo! Você está olhando para a questão sob um ângulo totalmente errado — ele riu."
+  },
+  {
+    "id": "corpus_03",
+    "category": "narrative_descriptive",
+    "source": "A thick, yellowish fog hung over the streets of London, muffling the sound of the passing carriages.",
+    "reference": "Um nevoeiro espesso e amarelado pairava sobre as ruas de Londres, abafando o som das carruagens que passavam."
+  },
+  {
+    "id": "corpus_04",
+    "category": "narrative_atmospheric",
+    "source": "The wind howled across the desolate moors, rattling the heavy wooden shutters of the ancient manor.",
+    "reference": "O vento uivava através das charnecas desoladas, sacudindo as pesadas venezianas de madeira da antiga mansão."
+  },
+  {
+    "id": "corpus_05",
+    "category": "pronoun_ambiguity",
+    "source": "The doctor handed the envelope to the inspector, although he knew it was a dangerous thing to do.",
+    "reference": "O médico entregou o envelope ao inspetor, embora soubesse que era algo perigoso de se fazer."
+  },
+  {
+    "id": "corpus_06",
+    "category": "honorific_and_title",
+    "source": "Lady Margaret greeted Dr. Watson warmly, but her hands trembled as she offered him tea.",
+    "reference": "Lady Margaret cumprimentou o Dr. Watson calorosamente, mas suas mãos tremiam ao lhe oferecer chá."
+  },
+  {
+    "id": "corpus_07",
+    "category": "complex_syntax",
+    "source": "Having thoroughly searched the library without finding the hidden ledger, they resolved to examine the cellar.",
+    "reference": "Tendo revistado minuciosamente a biblioteca sem encontrar o livro de registros oculto, decidiram examinar o porão."
+  },
+  {
+    "id": "corpus_08",
+    "category": "dialogue_interrupted",
+    "source": "'If the telegram arrives before dusk—' he paused, glancing warily toward the shadowed corridor.",
+    "reference": "— Se o telegrama chegar antes do anoitecer... — ele fez uma pausa, olhando cautelosamente para o corredor sombreado."
+  },
+  {
+    "id": "corpus_09",
+    "category": "sensory_prose",
+    "source": "The bitter aroma of burnt tobacco mingled with the damp smell of old parchment in the small study.",
+    "reference": "O aroma amargo de tabaco queimado misturava-se ao cheiro úmido de pergaminho antigo no pequeno gabinete."
+  },
+  {
+    "id": "corpus_10",
+    "category": "technical_deduction",
+    "source": "The distinct indentations in the soft clay indicated a man of considerable weight wearing boots with square toes.",
+    "reference": "As indentações nítidas na argila macia indicavam um homem de peso considerável calçando botas de bico quadrado."
+  },
+  {
+    "id": "corpus_11",
+    "category": "dramatic_action",
+    "source": "With a sudden leap, the hound sprang over the stone wall and vanished into the darkness of the woods.",
+    "reference": "Com um salto repentino, o cão pulou o muro de pedra e desapareceu na escuridão do bosque."
+  },
+  {
+    "id": "corpus_12",
+    "category": "psychological_state",
+    "source": "A cold dread crept into his heart, freezing every rational argument he had prepared to soothe his companions.",
+    "reference": "Um pavor gélido insinuou-se em seu coração, congelando todos os argumentos racionais que havia preparado para acalmar seus companheiros."
+  },
+  {
+    "id": "corpus_13",
+    "category": "idiomatic_expression",
+    "source": "He was walking on thin ice, and he knew that a single misstep would bring the entire house down.",
+    "reference": "Ele estava pisando em gelo fino, e sabia que um único passo em falso colocaria tudo a perder."
+  },
+  {
+    "id": "corpus_14",
+    "category": "dialogue_inquisitive",
+    "source": "'Pray tell me, sir, how could anyone have escaped through that barred window without leaving a trace?'",
+    "reference": "— Diga-me, por favor, senhor, como alguém poderia ter escapado por aquela janela gradeada sem deixar rastros?"
+  },
+  {
+    "id": "corpus_15",
+    "category": "setting_interior",
+    "source": "Faint moonlight filtered through the stained-glass window, casting eerie crimson patterns upon the marble floor.",
+    "reference": "Uma tênue luz do luar filtrava-se pelo vitral, projetando sinistros padrões carmesins sobre o chão de mármore."
+  },
+  {
+    "id": "corpus_16",
+    "category": "philosophical_aside",
+    "source": "Memory is a treacherous companion, magnifying our sorrows while fading the contours of forgotten triumphs.",
+    "reference": "A memória é uma companheira traiçoeira, ampliando nossos pesares enquanto desvanece os contornos de triunfos esquecidos."
+  },
+  {
+    "id": "corpus_17",
+    "category": "dialogue_urgent",
+    "source": "'Hurry, Watson, before the midnight train departs!' cried the detective, seizing his coat and cane.",
+    "reference": "— Depressa, Watson, antes que o trem da meia-noite parta! — gritou o detetive, apanhando seu casaco e bengala."
+  },
+  {
+    "id": "corpus_18",
+    "category": "narrative_conclusion",
+    "source": "The dawn broke slowly, painting the eastern horizon in pale streaks of rose and amber.",
+    "reference": "A aurora rompeu lentamente, pintando o horizonte oriental com suaves faixas de rosa e âmbar."
+  },
+  {
+    "id": "corpus_19",
+    "category": "character_intro",
+    "source": "Inspector Lestrade of Scotland Yard was a lean, ferret-like man with sharp eyes and an irritable temperament.",
+    "reference": "O Inspetor Lestrade, da Scotland Yard, era um homem magro, com feições de furão, olhos aguçados e temperamento irritadiço."
+  },
+  {
+    "id": "corpus_20",
+    "category": "climax_revelation",
+    "source": "'The sapphire was never in the safe,' whispered Holmes quietly; 'it was sewn into the lining of the carriage.'",
+    "reference": "— A safira nunca esteve no cofre — sussurrou Holmes calmamente —; ela foi costurada no forro da carruagem."
+  }
+]

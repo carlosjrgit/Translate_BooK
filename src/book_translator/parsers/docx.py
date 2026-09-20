@@ -27,6 +27,12 @@ from book_translator.errors import ParsingError
 from book_translator.logging import get_logger
 from book_translator.parsers.base import BaseParser
 from book_translator.parsers.normalization import normalize_unicode
+from book_translator.security import (
+    SecurityError,
+    safe_parse_xml,
+    validate_file_size_limit,
+    validate_zip_archive,
+)
 
 logger = get_logger("parsers.docx")
 
@@ -45,11 +51,10 @@ class DocxParser(BaseParser):
     def parse(self, file_path: Path | str, title: str | None = None) -> Document:
         path = self.validate_source_file(file_path)
 
-        if not zipfile.is_zipfile(path):
-            logger.error(f"Arquivo DOCX não é um ZIP válido: {path}")
-            raise ParsingError(f"Arquivo DOCX corrompido ou formato inválido: '{path.name}'")
-
         try:
+            validate_file_size_limit(path)
+            validate_zip_archive(path)
+
             with zipfile.ZipFile(path, "r") as zf:
                 namelist = zf.namelist()
                 if "word/document.xml" not in namelist:
@@ -64,7 +69,7 @@ class DocxParser(BaseParser):
                 if "docProps/core.xml" in namelist:
                     try:
                         core_xml = zf.read("docProps/core.xml")
-                        core_root = ET.fromstring(core_xml)
+                        core_root = safe_parse_xml(core_xml)
                         title_el = core_root.find(f"{NS_DC}title")
                         if title_el is not None and title_el.text and not doc_title:
                             doc_title = title_el.text.strip()
@@ -79,7 +84,7 @@ class DocxParser(BaseParser):
                 if "word/footnotes.xml" in namelist:
                     try:
                         fn_xml = zf.read("word/footnotes.xml")
-                        fn_root = ET.fromstring(fn_xml)
+                        fn_root = safe_parse_xml(fn_xml)
                         for fn_node in fn_root.findall(f"{NS_W}footnote"):
                             fn_id = fn_node.get(f"{NS_W}id")
                             # IDs negativos (-1, 0) são reservadas para separadores no Word
@@ -93,12 +98,14 @@ class DocxParser(BaseParser):
                 # 3. Conteúdo principal (word/document.xml)
                 try:
                     doc_xml = zf.read("word/document.xml")
-                    doc_root = ET.fromstring(doc_xml)
-                except ET.ParseError as e:
+                    doc_root = safe_parse_xml(doc_xml)
+                except (ET.ParseError, SecurityError) as e:
                     raise ParsingError(
-                        f"Arquivo DOCX contém XML corrompido em document.xml: {e}"
+                        f"Arquivo DOCX contém XML corrompido ou inseguro em document.xml: {e}"
                     ) from e
 
+        except SecurityError as e:
+            raise ParsingError(f"Arquivo DOCX corrompido ou violou políticas de segurança: {e}") from e
         except zipfile.BadZipFile as e:
             raise ParsingError(f"Arquivo DOCX corrompido ou truncado: '{path.name}'") from e
         except ParsingError:

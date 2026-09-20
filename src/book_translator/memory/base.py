@@ -10,8 +10,24 @@ from book_translator.memory.models import (
     GlossaryEntry,
     LockedVerificationResult,
     MemoryRevision,
-    StyleBible,
     TranslationMemoryEntry,
+)
+from book_translator.memory.story_memory import (
+    ChapterSummary,
+    CharacterState,
+    PersistentFact,
+    QAStoryAnomaly,
+    StoryContextSnapshot,
+    StoryCrossReference,
+    StoryEvent,
+    StoryMemory,
+    StoryRelationship,
+)
+from book_translator.memory.style_bible import (
+    StyleBible,
+    StyleEvidence,
+    StyleRule,
+    StyleViolation,
 )
 
 
@@ -39,6 +55,18 @@ __all__ = [
     "TranslationMemoryEntry",
     "GlossaryEntry",
     "StyleBible",
+    "StyleRule",
+    "StyleEvidence",
+    "StyleViolation",
+    "StoryMemory",
+    "StoryRelationship",
+    "ChapterSummary",
+    "CharacterState",
+    "StoryEvent",
+    "PersistentFact",
+    "StoryCrossReference",
+    "StoryContextSnapshot",
+    "QAStoryAnomaly",
     "MemoryRevision",
     "ConflictReport",
     "LockedVerificationResult",

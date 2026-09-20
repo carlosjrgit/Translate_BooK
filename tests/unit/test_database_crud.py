@@ -31,7 +31,9 @@ from book_translator.errors import DatabaseError
 from book_translator.memory.base import (
     CharacterEntry,
     GlossaryEntry,
+    StoryMemory,
     StyleBible,
+    StyleRule,
     TranslationMemoryEntry,
 )
 from book_translator.qa.base import IssueSeverity, QAIssue, QAReport
@@ -414,3 +416,168 @@ def test_end_to_end_parsed_document_sqlite_roundtrip(db: SQLiteDatabase, tmp_pat
     assert loaded_ch.image_placeholders[0].caption_raw == "Figure 1: The manor in the rain."
     assert loaded_ch.image_placeholders[0].relative_path == "images/fig1.png"
     assert loaded_ch.image_placeholders[0].source_location.line_number == 9
+
+
+def test_story_memory_and_style_bible_full_persistence(db: SQLiteDatabase, tmp_path: Path) -> None:
+    """Valida persistência e recuperação completa de StyleBible e StoryMemory com evidências e inferências."""
+    project_id = "mem_persist_proj"
+    meta = ProjectMetadata(
+        project_id=project_id, book_title="Memory Persist", source_file_path="dummy"
+    )
+    db.save_project(Project(metadata=meta, project_dir=tmp_path, db_path=db.db_path))
+
+    # 1. StyleBible com regras explícitas e inferidas
+    sb = StyleBible(narrator="terceira pessoa onisciente", narrative_person="3a")
+    sb.set_rule(
+        StyleRule(
+            dimension="profanity",
+            rule="atenuar palavrões para termos brandos",
+            evidence="Texto original continha 'damn' traduzido como 'droga'",
+            confidence=0.9,
+            is_inferred=False,
+            source_type="explicit",
+            locked=True,
+        )
+    )
+    sb.set_rule(
+        StyleRule(
+            dimension="formality",
+            rule="registro informal coloquial",
+            evidence="Uso recorrente de gírias nos diálogos",
+            confidence=0.75,
+            is_inferred=True,
+            source_type="inference",
+        )
+    )
+    db.save_style_bible(project_id, sb)
+
+    loaded_sb = db.get_style_bible(project_id)
+    assert loaded_sb is not None
+    assert loaded_sb.narrator == "terceira pessoa onisciente"
+    assert len(loaded_sb.rules) >= 2
+    prof_rule = loaded_sb.get_rule("profanity")
+    assert prof_rule is not None
+    assert prof_rule.is_inferred is False
+    assert prof_rule.source_type == "explicit"
+    assert prof_rule.locked is True
+    assert "damn" in prof_rule.evidence
+
+    form_rule = loaded_sb.get_rule("formality")
+    assert form_rule is not None
+    assert form_rule.is_inferred is True
+    assert form_rule.source_type == "inference"
+    assert form_rule.confidence == 0.75
+
+    # 2. StoryMemory com todas as estruturas
+    story = StoryMemory(project_id=project_id)
+    story.record_summary(
+        chapter_id="ch_01",
+        summary="Arthur acorda e descobre a demolição iminente.",
+        section_id="sec_01",
+        key_developments=["Casa cercada por tratores", "Encontro com Ford"],
+        open_questions=["Quem é Ford Prefect?"],
+    )
+    story.record_character_state(
+        character_id="arthur",
+        chapter_id="ch_01",
+        state="alive",
+        location="casa",
+        physical_condition="ressaca",
+        emotional_state="confuso",
+        evidence="Arthur levantou com dor de cabeça e viu os tratores.",
+        confidence=1.0,
+        is_inferred=False,
+    )
+    story.record_relationship(
+        source_char="arthur",
+        target_char="ford",
+        rel_type="amigo",
+        description="Amigos de bar há cinco anos",
+        chapter_id="ch_01",
+        evidence="Ford conhecia Arthur há 5 anos na Terra.",
+        is_inferred=False,
+        confidence=0.95,
+    )
+    story.record_relationship(
+        source_char="arthur",
+        target_char="prosser",
+        rel_type="antagonista",
+        description="Sr. Prosser quer demolir a casa",
+        chapter_id="ch_01",
+        evidence="Prosser ordenou o avanço dos tratores.",
+        is_inferred=True,
+        confidence=0.8,
+    )
+    story.record_event(
+        chapter_id="ch_01",
+        order_index=1,
+        title="Tratores chegam",
+        description="Bulldozers amarelos cercam o chalé",
+        impact="Alto",
+        characters=["arthur", "prosser"],
+        evidence="O trator amarelo parou em frente à porta.",
+    )
+    story.record_fact(
+        entity_id="terra",
+        fact="A Terra está na rota de uma via hiperespacial",
+        chapter_id="ch_01",
+        scope="global",
+        evidence="Aviso de demolição galáctica transmitido.",
+        is_inferred=False,
+    )
+    story.record_cross_reference(
+        source_chapter="ch_01",
+        target_chapter="ch_02",
+        ref_type="foreshadowing",
+        description="Ford menciona a toalha",
+        evidence="Nunca saia de casa sem sua toalha.",
+    )
+
+    db.save_story_memory(project_id, story)
+
+    loaded_story = db.get_story_memory(project_id)
+    assert loaded_story is not None
+    # Resumo
+    summary = loaded_story.get_chapter_summary("ch_01")
+    assert summary is not None
+    assert "demolição" in summary.summary
+    assert len(summary.key_developments) == 2
+
+    # Character state
+    c_state = loaded_story.get_character_state("arthur", "ch_01")
+    assert c_state is not None
+    assert c_state.state == "alive"
+    assert c_state.location == "casa"
+    assert c_state.evidence == "Arthur levantou com dor de cabeça e viu os tratores."
+    assert c_state.is_inferred is False
+
+    # Relationships
+    rels = loaded_story.get_character_relationships("arthur")
+    assert len(rels) == 2
+    ford_rel = next(r for r in rels if r.target_character_id == "ford")
+    assert ford_rel.relation_type == "amigo"
+    assert ford_rel.is_inferred is False
+    assert ford_rel.confidence == 0.95
+
+    prosser_rel = next(r for r in rels if r.target_character_id == "prosser")
+    assert prosser_rel.relation_type == "antagonista"
+    assert prosser_rel.is_inferred is True
+    assert prosser_rel.source_type == "inference"
+
+    # Events
+    events = loaded_story.get_chronology(chapter_id="ch_01")
+    assert len(events) == 1
+    assert events[0].title == "Tratores chegam"
+    assert events[0].evidence == "O trator amarelo parou em frente à porta."
+
+    # Facts
+    facts = loaded_story.get_persistent_facts("terra")
+    assert len(facts) == 1
+    assert "hiperespacial" in facts[0].fact
+    assert facts[0].is_inferred is False
+
+    # Cross References
+    xrefs = loaded_story.get_cross_references(chapter_id="ch_01")
+    assert len(xrefs) == 1
+    assert xrefs[0].ref_type == "foreshadowing"
+    assert "toalha" in xrefs[0].evidence

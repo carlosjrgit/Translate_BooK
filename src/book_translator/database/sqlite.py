@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from book_translator.context.base import TranslationContext
+from book_translator.context.models import ContextItemScore, ContextMetrics, SemanticSnippet
 from book_translator.core.models import (
     Chapter,
     Checkpoint,
@@ -34,13 +37,26 @@ from book_translator.database.connection import get_sqlite_connection, transacti
 from book_translator.database.migrations import apply_migrations
 from book_translator.errors import DatabaseError
 from book_translator.memory.base import (
+    ChapterSummary,
     CharacterEntry,
+    CharacterState,
     GlossaryEntry,
     MemoryRevision,
+    PersistentFact,
+    StoryCrossReference,
+    StoryEvent,
+    StoryMemory,
+    StoryRelationship,
     StyleBible,
+    StyleRule,
     TranslationMemoryEntry,
 )
-from book_translator.qa.base import QAReport
+from book_translator.qa.base import (
+    IssueSeverity,
+    QAFixAuditRecord,
+    QAIssue,
+    QAReport,
+)
 from book_translator.translation.base import TranslationDraft
 
 
@@ -1074,7 +1090,6 @@ class SQLiteDatabase(DatabaseInterface):
         reason: str = "",
     ) -> None:
         """Registra uma alteração no log de auditoria de memórias."""
-        import uuid
 
         audit_id = f"audit_{uuid.uuid4().hex[:12]}"
         with transaction(self.conn) as cur:
@@ -1124,13 +1139,22 @@ class SQLiteDatabase(DatabaseInterface):
 
     def save_style_bible(self, project_id: str, style_bible: StyleBible) -> None:
         sb_id = f"style_{project_id}"
+        rules_serialized = {k: v.to_dict() for k, v in getattr(style_bible, "rules", {}).items()}
+        conventions_serialized = getattr(style_bible, "internal_conventions", [])
+        narrative_person = getattr(style_bible, "narrative_person", "terceira pessoa")
+        predominant_tense = getattr(style_bible, "predominant_tense", "passado")
+        formality_level = getattr(style_bible, "formality_level", "formal")
+        title_treatment = getattr(style_bible, "title_treatment", "traduzir")
+
         with transaction(self.conn) as cur:
             cur.execute(
                 """
                 INSERT INTO style_bible (
                     id, project_id, narrator, register, dialogue_style, profanity_handling,
-                    predominant_treatment, punctuation_standard, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    predominant_treatment, punctuation_standard, metadata_json,
+                    narrative_person, predominant_tense, formality_level, title_treatment,
+                    internal_conventions_json, rules_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id) DO UPDATE SET
                     narrator=excluded.narrator,
                     register=excluded.register,
@@ -1138,7 +1162,13 @@ class SQLiteDatabase(DatabaseInterface):
                     profanity_handling=excluded.profanity_handling,
                     predominant_treatment=excluded.predominant_treatment,
                     punctuation_standard=excluded.punctuation_standard,
-                    metadata_json=excluded.metadata_json;
+                    metadata_json=excluded.metadata_json,
+                    narrative_person=excluded.narrative_person,
+                    predominant_tense=excluded.predominant_tense,
+                    formality_level=excluded.formality_level,
+                    title_treatment=excluded.title_treatment,
+                    internal_conventions_json=excluded.internal_conventions_json,
+                    rules_json=excluded.rules_json;
                 """,
                 (
                     sb_id,
@@ -1153,10 +1183,16 @@ class SQLiteDatabase(DatabaseInterface):
                         {
                             **style_bible.metadata,
                             "tone": getattr(style_bible, "tone", "literário"),
-                            "formality_level": getattr(style_bible, "formality_level", "formal"),
+                            "formality_level": formality_level,
                             "custom_rules": getattr(style_bible, "custom_rules", {}),
                         }
                     ),
+                    narrative_person,
+                    predominant_tense,
+                    formality_level,
+                    title_treatment,
+                    json.dumps(conventions_serialized),
+                    json.dumps(rules_serialized),
                 ),
             )
 
@@ -1170,26 +1206,662 @@ class SQLiteDatabase(DatabaseInterface):
             if not row:
                 return None
             meta = json.loads(row["metadata_json"] or "{}")
+
+            keys = row.keys()
+            rules_dict: dict[str, StyleRule] = {}
+            if "rules_json" in keys and row["rules_json"]:
+                raw_rules = json.loads(row["rules_json"])
+                for rname, rdata in raw_rules.items():
+                    if isinstance(rdata, dict):
+                        rules_dict[rname] = StyleRule.from_dict(rdata)
+
+            conventions = (
+                json.loads(row["internal_conventions_json"])
+                if ("internal_conventions_json" in keys and row["internal_conventions_json"])
+                else []
+            )
+            narrative_person = (
+                row["narrative_person"]
+                if ("narrative_person" in keys and row["narrative_person"])
+                else "terceira pessoa"
+            )
+            predominant_tense = (
+                row["predominant_tense"]
+                if ("predominant_tense" in keys and row["predominant_tense"])
+                else "passado"
+            )
+            formality_level = (
+                row["formality_level"]
+                if ("formality_level" in keys and row["formality_level"])
+                else meta.get("formality_level", "formal")
+            )
+            title_treatment = (
+                row["title_treatment"]
+                if ("title_treatment" in keys and row["title_treatment"])
+                else "traduzir"
+            )
+
             return StyleBible(
                 narrator=row["narrator"],
-                register=row["register"],
+                narrative_person=narrative_person,
+                predominant_tense=predominant_tense,
+                formality_level=formality_level,
                 dialogue_style=row["dialogue_style"],
                 profanity_handling=row["profanity_handling"],
+                treatment_forms=row["predominant_treatment"],
+                editorial_punctuation=row["punctuation_standard"],
+                title_treatment=title_treatment,
+                internal_conventions=conventions,
+                register=row["register"],
                 predominant_treatment=row["predominant_treatment"],
                 punctuation_standard=row["punctuation_standard"],
                 project_id=str(project_id),
                 tone=meta.get("tone", "literário"),
-                formality_level=meta.get("formality_level", "formal"),
                 custom_rules=meta.get("custom_rules", {}),
                 metadata=meta,
+                rules=rules_dict,
             )
         finally:
             cur.close()
 
     # -------------------------------------------------------------------------
+    # Story / Context Memory
+    # -------------------------------------------------------------------------
+
+    def save_story_summary(self, project_id: str, summary: ChapterSummary) -> None:
+        """Salva ou atualiza um resumo de capítulo ou seção."""
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO story_summaries (
+                    id, project_id, unit_type, unit_id, title, summary_text,
+                    key_events_json, characters_present_json, order_index, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title=excluded.title,
+                    summary_text=excluded.summary_text,
+                    key_events_json=excluded.key_events_json,
+                    characters_present_json=excluded.characters_present_json,
+                    order_index=excluded.order_index,
+                    metadata_json=excluded.metadata_json,
+                    updated_at=CURRENT_TIMESTAMP;
+                """,
+                (
+                    summary.id,
+                    str(project_id),
+                    summary.unit_type,
+                    summary.unit_id,
+                    summary.title,
+                    summary.summary_text,
+                    json.dumps(summary.key_events),
+                    json.dumps(summary.characters_present),
+                    summary.order_index,
+                    json.dumps(summary.metadata),
+                ),
+            )
+
+    def get_story_summaries(
+        self, project_id: str, unit_type: str | None = None
+    ) -> list[ChapterSummary]:
+        """Retorna todos os resumos de capítulos/seções do projeto."""
+        cur = self.conn.cursor()
+        try:
+            if unit_type:
+                cur.execute(
+                    "SELECT * FROM story_summaries WHERE project_id = ? AND unit_type = ? ORDER BY order_index ASC;",
+                    (str(project_id), unit_type),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM story_summaries WHERE project_id = ? ORDER BY order_index ASC;",
+                    (str(project_id),),
+                )
+            rows = cur.fetchall()
+            return [
+                ChapterSummary(
+                    id=r["id"],
+                    unit_id=r["unit_id"],
+                    summary_text=r["summary_text"],
+                    unit_type=r["unit_type"],
+                    title=r["title"] or "",
+                    key_events=json.loads(r["key_events_json"] or "[]"),
+                    characters_present=json.loads(r["characters_present_json"] or "[]"),
+                    order_index=r["order_index"],
+                    metadata=json.loads(r["metadata_json"] or "{}"),
+                )
+                for r in rows
+            ]
+        finally:
+            cur.close()
+
+    def get_story_summary(self, project_id: str, unit_id: str) -> ChapterSummary | None:
+        """Recupera o resumo de uma unidade específica."""
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                "SELECT * FROM story_summaries WHERE project_id = ? AND unit_id = ? LIMIT 1;",
+                (str(project_id), str(unit_id)),
+            )
+            r = cur.fetchone()
+            if not r:
+                return None
+            return ChapterSummary(
+                id=r["id"],
+                unit_id=r["unit_id"],
+                summary_text=r["summary_text"],
+                unit_type=r["unit_type"],
+                title=r["title"] or "",
+                key_events=json.loads(r["key_events_json"] or "[]"),
+                characters_present=json.loads(r["characters_present_json"] or "[]"),
+                order_index=r["order_index"],
+                metadata=json.loads(r["metadata_json"] or "{}"),
+            )
+        finally:
+            cur.close()
+
+    def save_character_state(self, project_id: str, state: CharacterState) -> None:
+        """Salva o estado de um personagem em determinado capítulo."""
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO character_states (
+                    id, project_id, character_id, chapter_id, alive_status,
+                    location, emotional_state, role_or_title, known_facts_json,
+                    order_index, metadata_json, evidence, confidence, is_inferred, source_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    alive_status=excluded.alive_status,
+                    location=excluded.location,
+                    emotional_state=excluded.emotional_state,
+                    role_or_title=excluded.role_or_title,
+                    known_facts_json=excluded.known_facts_json,
+                    order_index=excluded.order_index,
+                    metadata_json=excluded.metadata_json,
+                    evidence=excluded.evidence,
+                    confidence=excluded.confidence,
+                    is_inferred=excluded.is_inferred,
+                    source_type=excluded.source_type;
+                """,
+                (
+                    state.id,
+                    str(project_id),
+                    state.character_id,
+                    state.chapter_id,
+                    state.alive_status,
+                    state.location,
+                    state.emotional_state,
+                    state.role_or_title,
+                    json.dumps(state.known_facts),
+                    state.order_index,
+                    json.dumps(state.metadata),
+                    getattr(state, "evidence", "") or "",
+                    float(getattr(state, "confidence", 1.0)),
+                    1 if getattr(state, "is_inferred", False) else 0,
+                    getattr(state, "source_type", "explicit") or "explicit",
+                ),
+            )
+
+    def get_character_states(
+        self, project_id: str, character_id: str | None = None
+    ) -> list[CharacterState]:
+        """Recupera a evolução dos estados de personagens."""
+        cur = self.conn.cursor()
+        try:
+            if character_id:
+                cur.execute(
+                    "SELECT * FROM character_states WHERE project_id = ? AND character_id = ? ORDER BY order_index ASC;",
+                    (str(project_id), str(character_id)),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM character_states WHERE project_id = ? ORDER BY order_index ASC;",
+                    (str(project_id),),
+                )
+            rows = cur.fetchall()
+            states = []
+            for r in rows:
+                keys = r.keys()
+                states.append(
+                    CharacterState(
+                        id=r["id"],
+                        character_id=r["character_id"],
+                        chapter_id=r["chapter_id"],
+                        alive_status=r["alive_status"],
+                        location=r["location"] or "",
+                        emotional_state=r["emotional_state"] or "",
+                        role_or_title=r["role_or_title"] or "",
+                        known_facts=json.loads(r["known_facts_json"] or "[]"),
+                        order_index=r["order_index"],
+                        metadata=json.loads(r["metadata_json"] or "{}"),
+                        evidence=r["evidence"] if "evidence" in keys and r["evidence"] else "",
+                        confidence=float(r["confidence"])
+                        if "confidence" in keys and r["confidence"] is not None
+                        else 1.0,
+                        is_inferred=bool(r["is_inferred"])
+                        if "is_inferred" in keys and r["is_inferred"]
+                        else False,
+                        source_type=r["source_type"]
+                        if "source_type" in keys and r["source_type"]
+                        else "explicit",
+                    )
+                )
+            return states
+        finally:
+            cur.close()
+
+    def save_story_relationship(self, project_id: str, relationship: StoryRelationship) -> None:
+        """Salva ou atualiza uma relação interpessoal ativa da história."""
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO story_relationships (
+                    id, project_id, source_character_id, target_character_id,
+                    relation_type, description, chapter_id, evidence, confidence,
+                    is_inferred, source_type, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    source_character_id=excluded.source_character_id,
+                    target_character_id=excluded.target_character_id,
+                    relation_type=excluded.relation_type,
+                    description=excluded.description,
+                    chapter_id=excluded.chapter_id,
+                    evidence=excluded.evidence,
+                    confidence=excluded.confidence,
+                    is_inferred=excluded.is_inferred,
+                    source_type=excluded.source_type,
+                    metadata_json=excluded.metadata_json;
+                """,
+                (
+                    relationship.id,
+                    str(project_id),
+                    relationship.source_character_id,
+                    relationship.target_character_id,
+                    relationship.relation_type,
+                    relationship.description,
+                    relationship.chapter_id,
+                    relationship.evidence,
+                    relationship.confidence,
+                    1 if relationship.is_inferred else 0,
+                    relationship.source_type,
+                    json.dumps(relationship.metadata),
+                ),
+            )
+
+    def get_story_relationships(
+        self, project_id: str, character_id: str | None = None
+    ) -> list[StoryRelationship]:
+        """Recupera relações interpessoais cadastradas no projeto."""
+        cur = self.conn.cursor()
+        try:
+            if character_id:
+                cur.execute(
+                    """
+                    SELECT * FROM story_relationships
+                    WHERE project_id = ? AND (source_character_id = ? OR target_character_id = ?)
+                    ORDER BY created_at ASC;
+                    """,
+                    (str(project_id), str(character_id), str(character_id)),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM story_relationships WHERE project_id = ? ORDER BY created_at ASC;",
+                    (str(project_id),),
+                )
+            rows = cur.fetchall()
+            rels = []
+            for r in rows:
+                keys = r.keys()
+                rels.append(
+                    StoryRelationship(
+                        id=r["id"],
+                        source_character_id=r["source_character_id"],
+                        target_character_id=r["target_character_id"],
+                        relation_type=r["relation_type"],
+                        description=r["description"] or "",
+                        chapter_id=r["chapter_id"] or "",
+                        evidence=r["evidence"] or "",
+                        confidence=float(r["confidence"])
+                        if "confidence" in keys and r["confidence"] is not None
+                        else 1.0,
+                        is_inferred=bool(r["is_inferred"])
+                        if "is_inferred" in keys and r["is_inferred"]
+                        else False,
+                        source_type=r["source_type"]
+                        if "source_type" in keys and r["source_type"]
+                        else "explicit",
+                        metadata=json.loads(r["metadata_json"] or "{}"),
+                    )
+                )
+            return rels
+        finally:
+            cur.close()
+
+    def save_story_event(self, project_id: str, event: StoryEvent) -> None:
+        """Salva um evento na linha do tempo da história."""
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO story_events (
+                    id, project_id, chapter_id, unit_id, description,
+                    characters_involved_json, significance, narrative_order,
+                    chronological_order, evidence, metadata_json,
+                    confidence, is_inferred, source_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    description=excluded.description,
+                    characters_involved_json=excluded.characters_involved_json,
+                    significance=excluded.significance,
+                    narrative_order=excluded.narrative_order,
+                    chronological_order=excluded.chronological_order,
+                    evidence=excluded.evidence,
+                    metadata_json=excluded.metadata_json,
+                    confidence=excluded.confidence,
+                    is_inferred=excluded.is_inferred,
+                    source_type=excluded.source_type;
+                """,
+                (
+                    event.id,
+                    str(project_id),
+                    event.chapter_id,
+                    event.unit_id,
+                    event.description,
+                    json.dumps(event.characters_involved),
+                    event.significance,
+                    event.narrative_order,
+                    event.chronological_order,
+                    event.evidence,
+                    json.dumps(event.metadata),
+                    float(getattr(event, "confidence", 1.0)),
+                    1 if getattr(event, "is_inferred", False) else 0,
+                    getattr(event, "source_type", "explicit") or "explicit",
+                ),
+            )
+
+    def get_story_events(
+        self, project_id: str, chapter_id: str | None = None, chronological: bool = False
+    ) -> list[StoryEvent]:
+        """Recupera eventos do projeto com ordenação narrativa ou cronológica."""
+        cur = self.conn.cursor()
+        try:
+            order_by = (
+                "ORDER BY chronological_order ASC, narrative_order ASC"
+                if chronological
+                else "ORDER BY narrative_order ASC, chronological_order ASC"
+            )
+            if chapter_id:
+                cur.execute(
+                    f"SELECT * FROM story_events WHERE project_id = ? AND chapter_id = ? {order_by};",
+                    (str(project_id), str(chapter_id)),
+                )
+            else:
+                cur.execute(
+                    f"SELECT * FROM story_events WHERE project_id = ? {order_by};",
+                    (str(project_id),),
+                )
+            rows = cur.fetchall()
+            events = []
+            for r in rows:
+                keys = r.keys()
+                events.append(
+                    StoryEvent(
+                        id=r["id"],
+                        chapter_id=r["chapter_id"],
+                        description=r["description"],
+                        unit_id=r["unit_id"] or "",
+                        characters_involved=json.loads(r["characters_involved_json"] or "[]"),
+                        significance=r["significance"],
+                        narrative_order=r["narrative_order"],
+                        chronological_order=r["chronological_order"],
+                        evidence=r["evidence"] or "",
+                        metadata=json.loads(r["metadata_json"] or "{}"),
+                        confidence=float(r["confidence"])
+                        if "confidence" in keys and r["confidence"] is not None
+                        else 1.0,
+                        is_inferred=bool(r["is_inferred"])
+                        if "is_inferred" in keys and r["is_inferred"]
+                        else False,
+                        source_type=r["source_type"]
+                        if "source_type" in keys and r["source_type"]
+                        else "explicit",
+                    )
+                )
+            return events
+        finally:
+            cur.close()
+
+    def save_story_fact(self, project_id: str, fact: PersistentFact) -> None:
+        """Salva um fato persistente (lore, regra) da obra."""
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO story_facts (
+                    id, project_id, category, statement, subject_entity_ids_json,
+                    evidence, confidence, locked, occurrences_json, metadata_json,
+                    is_inferred, source_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    category=excluded.category,
+                    statement=excluded.statement,
+                    subject_entity_ids_json=excluded.subject_entity_ids_json,
+                    evidence=excluded.evidence,
+                    confidence=excluded.confidence,
+                    locked=excluded.locked,
+                    occurrences_json=excluded.occurrences_json,
+                    metadata_json=excluded.metadata_json,
+                    is_inferred=excluded.is_inferred,
+                    source_type=excluded.source_type;
+                """,
+                (
+                    fact.id,
+                    str(project_id),
+                    fact.category,
+                    fact.statement,
+                    json.dumps(fact.subject_entity_ids),
+                    fact.evidence,
+                    fact.confidence,
+                    1 if fact.locked else 0,
+                    json.dumps(fact.occurrences),
+                    json.dumps(fact.metadata),
+                    1 if getattr(fact, "is_inferred", False) else 0,
+                    getattr(fact, "source_type", "explicit") or "explicit",
+                ),
+            )
+
+    def get_story_facts(
+        self,
+        project_id: str,
+        category: str | None = None,
+        locked_only: bool = False,
+    ) -> list[PersistentFact]:
+        """Recupera fatos persistentes do projeto."""
+        cur = self.conn.cursor()
+        try:
+            conditions = ["project_id = ?"]
+            params: list[Any] = [str(project_id)]
+            if category:
+                conditions.append("category = ?")
+                params.append(category)
+            if locked_only:
+                conditions.append("locked = 1")
+            sql = f"SELECT * FROM story_facts WHERE {' AND '.join(conditions)} ORDER BY created_at ASC;"
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+            facts = []
+            for r in rows:
+                keys = r.keys()
+                facts.append(
+                    PersistentFact(
+                        id=r["id"],
+                        statement=r["statement"],
+                        category=r["category"],
+                        subject_entity_ids=json.loads(r["subject_entity_ids_json"] or "[]"),
+                        evidence=r["evidence"] or "",
+                        confidence=float(r["confidence"]),
+                        locked=bool(r["locked"]),
+                        occurrences=json.loads(r["occurrences_json"] or "[]"),
+                        metadata=json.loads(r["metadata_json"] or "{}"),
+                        is_inferred=bool(r["is_inferred"])
+                        if "is_inferred" in keys and r["is_inferred"]
+                        else False,
+                        source_type=r["source_type"]
+                        if "source_type" in keys and r["source_type"]
+                        else "explicit",
+                    )
+                )
+            return facts
+        finally:
+            cur.close()
+
+    def save_story_cross_reference(self, project_id: str, cross_ref: StoryCrossReference) -> None:
+        """Salva uma referência cruzada entre trechos da obra."""
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO story_cross_references (
+                    id, project_id, source_unit_id, target_unit_id, ref_type,
+                    description, evidence, metadata_json, confidence, is_inferred, source_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    ref_type=excluded.ref_type,
+                    description=excluded.description,
+                    evidence=excluded.evidence,
+                    metadata_json=excluded.metadata_json,
+                    confidence=excluded.confidence,
+                    is_inferred=excluded.is_inferred,
+                    source_type=excluded.source_type;
+                """,
+                (
+                    cross_ref.id,
+                    str(project_id),
+                    cross_ref.source_unit_id,
+                    cross_ref.target_unit_id,
+                    cross_ref.ref_type,
+                    cross_ref.description,
+                    cross_ref.evidence,
+                    json.dumps(cross_ref.metadata),
+                    float(getattr(cross_ref, "confidence", 1.0)),
+                    1 if getattr(cross_ref, "is_inferred", False) else 0,
+                    getattr(cross_ref, "source_type", "explicit") or "explicit",
+                ),
+            )
+
+    def get_story_cross_references(
+        self, project_id: str, unit_id: str | None = None
+    ) -> list[StoryCrossReference]:
+        """Recupera referências cruzadas vinculadas a uma unidade."""
+        cur = self.conn.cursor()
+        try:
+            if unit_id:
+                cur.execute(
+                    """
+                    SELECT * FROM story_cross_references
+                    WHERE project_id = ? AND (source_unit_id = ? OR target_unit_id = ?)
+                    ORDER BY created_at ASC;
+                    """,
+                    (str(project_id), str(unit_id), str(unit_id)),
+                )
+            else:
+                cur.execute(
+                    "SELECT * FROM story_cross_references WHERE project_id = ? ORDER BY created_at ASC;",
+                    (str(project_id),),
+                )
+            rows = cur.fetchall()
+            refs = []
+            for r in rows:
+                keys = r.keys()
+                refs.append(
+                    StoryCrossReference(
+                        id=r["id"],
+                        source_unit_id=r["source_unit_id"],
+                        target_unit_id=r["target_unit_id"],
+                        description=r["description"],
+                        ref_type=r["ref_type"],
+                        evidence=r["evidence"] or "",
+                        metadata=json.loads(r["metadata_json"] or "{}"),
+                        confidence=float(r["confidence"])
+                        if "confidence" in keys and r["confidence"] is not None
+                        else 1.0,
+                        is_inferred=bool(r["is_inferred"])
+                        if "is_inferred" in keys and r["is_inferred"]
+                        else False,
+                        source_type=r["source_type"]
+                        if "source_type" in keys and r["source_type"]
+                        else "explicit",
+                    )
+                )
+            return refs
+        finally:
+            cur.close()
+
+    def save_story_memory(self, project_id: str, story_memory: StoryMemory) -> None:
+        """Persiste todos os elementos contidos na StoryMemory no banco de dados, incluindo relacionamentos."""
+        for summary in story_memory.get_all_summaries():
+            self.save_story_summary(project_id, summary)
+
+        for char_id in list(story_memory._character_states.keys()):
+            for state in story_memory._character_states[char_id]:
+                self.save_character_state(project_id, state)
+
+        for rel in story_memory.get_relationships():
+            self.save_story_relationship(project_id, rel)
+
+        for event in story_memory.get_events():
+            self.save_story_event(project_id, event)
+
+        for fact in story_memory.get_facts():
+            self.save_story_fact(project_id, fact)
+
+        for cross_ref in list(story_memory._cross_references.values()):
+            self.save_story_cross_reference(project_id, cross_ref)
+
+    def get_story_memory(self, project_id: str) -> StoryMemory:
+        """Carrega e reconstrói a StoryMemory completa do projeto a partir do banco de dados."""
+        sm = StoryMemory(project_id=str(project_id))
+        for summary in self.get_story_summaries(project_id):
+            sm._summaries[summary.unit_id] = summary
+            ch_id = summary.metadata.get("chapter_id")
+            if ch_id and ch_id not in sm._summaries:
+                sm._summaries[ch_id] = summary
+
+        for state in self.get_character_states(project_id):
+            if state.character_id not in sm._character_states:
+                sm._character_states[state.character_id] = []
+            sm._character_states[state.character_id].append(state)
+
+        for rel in self.get_story_relationships(project_id):
+            sm._relationships.append(rel)
+
+        for event in self.get_story_events(project_id):
+            sm._events[event.id] = event
+
+        for fact in self.get_story_facts(project_id):
+            sm._facts[fact.id] = fact
+
+        for cross_ref in self.get_story_cross_references(project_id):
+            sm._cross_references[cross_ref.id] = cross_ref
+
+        return sm
+
+    # -------------------------------------------------------------------------
     # Contexto e Traduções
     # -------------------------------------------------------------------------
     def save_context(self, context: TranslationContext) -> None:
+        meta = dict(context.extra_metadata)
+        meta["relevant_relationships"] = [
+            r.to_dict() if hasattr(r, "to_dict") else r.__dict__
+            for r in context.relevant_relationships
+        ]
+        meta["story_facts"] = [
+            f.to_dict() if hasattr(f, "to_dict") else f.__dict__ for f in context.story_facts
+        ]
+        meta["semantic_snippets"] = [s.to_dict() for s in context.semantic_snippets]
+        meta["scores"] = [s.to_dict() for s in context.scores]
+        meta["strategy_used"] = context.strategy_used
+        meta["reproducibility_hash"] = context.reproducibility_hash
+        meta["future_leakage_prevented"] = context.future_leakage_prevented
+        if context.metrics:
+            meta["metrics"] = context.metrics.to_dict()
+
         with transaction(self.conn) as cur:
             cur.execute(
                 """
@@ -1215,7 +1887,7 @@ class SQLiteDatabase(DatabaseInterface):
                     json.dumps([c.__dict__ for c in context.active_characters]),
                     json.dumps([g.__dict__ for g in context.relevant_glossary]),
                     json.dumps([t.__dict__ for t in context.established_translations]),
-                    json.dumps(context.extra_metadata),
+                    json.dumps(meta),
                 ),
             )
 
@@ -1226,12 +1898,71 @@ class SQLiteDatabase(DatabaseInterface):
             row = cur.fetchone()
             if not row:
                 return None
+
+            extra_meta = json.loads(row["extra_metadata_json"] or "{}")
+            raw_chars = json.loads(row["active_characters_json"] or "[]")
+            raw_gloss = json.loads(row["relevant_glossary_json"] or "[]")
+            raw_tm = json.loads(row["established_translations_json"] or "[]")
+
+            chars = [
+                CharacterEntry(**c)
+                if isinstance(c, dict) and not hasattr(CharacterEntry, "from_dict")
+                else CharacterEntry.from_dict(c)
+                if hasattr(CharacterEntry, "from_dict") and isinstance(c, dict)
+                else c
+                for c in raw_chars
+            ]
+            gloss = [
+                GlossaryEntry.from_dict(g)
+                if hasattr(GlossaryEntry, "from_dict") and isinstance(g, dict)
+                else GlossaryEntry(**g)
+                if isinstance(g, dict)
+                else g
+                for g in raw_gloss
+            ]
+            tm = [
+                TranslationMemoryEntry.from_dict(t)
+                if hasattr(TranslationMemoryEntry, "from_dict") and isinstance(t, dict)
+                else TranslationMemoryEntry(**t)
+                if isinstance(t, dict)
+                else t
+                for t in raw_tm
+            ]
+
+            raw_rels = extra_meta.pop("relevant_relationships", [])
+            raw_facts = extra_meta.pop("story_facts", [])
+            raw_snips = extra_meta.pop("semantic_snippets", [])
+            raw_scores = extra_meta.pop("scores", [])
+            strat = extra_meta.pop("strategy_used", "balanced")
+            r_hash = extra_meta.pop("reproducibility_hash", "")
+            f_prev = extra_meta.pop("future_leakage_prevented", True)
+            metrics_d = extra_meta.pop("metrics", None)
+
+            rels = [StoryRelationship.from_dict(r) if isinstance(r, dict) else r for r in raw_rels]
+            facts = [PersistentFact.from_dict(f) if isinstance(f, dict) else f for f in raw_facts]
+            snips = [SemanticSnippet.from_dict(s) if isinstance(s, dict) else s for s in raw_snips]
+            scores = [
+                ContextItemScore.from_dict(s) if isinstance(s, dict) else s for s in raw_scores
+            ]
+            metrics_obj = ContextMetrics(**metrics_d) if isinstance(metrics_d, dict) else None
+
             return TranslationContext(
                 segment_id=row["segment_id"],
                 preceding_text=json.loads(row["preceding_text_json"] or "[]"),
                 succeeding_text=json.loads(row["succeeding_text_json"] or "[]"),
                 chapter_summary=row["chapter_summary"],
-                extra_metadata=json.loads(row["extra_metadata_json"] or "{}"),
+                active_characters=chars,
+                relevant_glossary=gloss,
+                established_translations=tm,
+                relevant_relationships=rels,
+                story_facts=facts,
+                semantic_snippets=snips,
+                scores=scores,
+                strategy_used=strat,
+                reproducibility_hash=r_hash,
+                future_leakage_prevented=f_prev,
+                metrics=metrics_obj,
+                extra_metadata=extra_meta,
             )
         finally:
             cur.close()
@@ -1241,6 +1972,7 @@ class SQLiteDatabase(DatabaseInterface):
             for idx, cand in enumerate(draft.candidates, start=1):
                 cand_id = f"trans_{draft.segment_id}_{idx}"
                 is_selected = 1 if cand.text == draft.selected_text else 0
+                merged_meta = {**draft.metadata, **cand.metadata}
                 cur.execute(
                     """
                     INSERT INTO translations (
@@ -1250,7 +1982,8 @@ class SQLiteDatabase(DatabaseInterface):
                     ON CONFLICT(id) DO UPDATE SET
                         translated_text=excluded.translated_text,
                         score=excluded.score,
-                        is_selected=excluded.is_selected;
+                        is_selected=excluded.is_selected,
+                        metadata_json=excluded.metadata_json;
                     """,
                     (
                         cand_id,
@@ -1261,9 +1994,182 @@ class SQLiteDatabase(DatabaseInterface):
                         cand.score,
                         is_selected,
                         draft.execution_time_ms,
-                        json.dumps(cand.metadata),
+                        json.dumps(merged_meta),
                     ),
                 )
+
+    def get_translations(self, segment_id: str) -> list[dict[str, Any]]:
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT * FROM translations
+                WHERE segment_id = ?
+                ORDER BY candidate_rank ASC;
+                """,
+                (segment_id,),
+            )
+            rows = cur.fetchall()
+            results = []
+            for r in rows:
+                meta = json.loads(r["metadata_json"] or "{}")
+                results.append(
+                    {
+                        "id": r["id"],
+                        "segment_id": r["segment_id"],
+                        "translated_text": r["translated_text"],
+                        "engine_name": r["engine_name"],
+                        "candidate_rank": r["candidate_rank"],
+                        "score": r["score"],
+                        "is_selected": bool(r["is_selected"]),
+                        "execution_time_ms": r["execution_time_ms"],
+                        "metadata": meta,
+                        "created_at": str(r["created_at"]),
+                    }
+                )
+            return results
+        finally:
+            cur.close()
+
+    def get_selected_translation(self, segment_id: str) -> dict[str, Any] | None:
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT * FROM translations
+                WHERE segment_id = ? AND is_selected = 1
+                LIMIT 1;
+                """,
+                (segment_id,),
+            )
+            r = cur.fetchone()
+            if not r:
+                return None
+            meta = json.loads(r["metadata_json"] or "{}")
+            return {
+                "id": r["id"],
+                "segment_id": r["segment_id"],
+                "translated_text": r["translated_text"],
+                "engine_name": r["engine_name"],
+                "candidate_rank": r["candidate_rank"],
+                "score": r["score"],
+                "is_selected": True,
+                "execution_time_ms": r["execution_time_ms"],
+                "metadata": meta,
+                "created_at": str(r["created_at"]),
+            }
+        finally:
+            cur.close()
+
+    def save_translation_cache(
+        self,
+        cache_key: str,
+        project_id: str,
+        segment_id: str,
+        source_text: str,
+        target_text: str,
+        model_name: str,
+        runtime: str,
+        parameters: dict[str, Any],
+        context_hash: str,
+        glossary_terms: list[str] | None = None,
+    ) -> None:
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO translation_cache (
+                    cache_key, project_id, segment_id, source_text, target_text,
+                    model_name, runtime, parameters_json, context_hash, glossary_terms_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    target_text=excluded.target_text,
+                    parameters_json=excluded.parameters_json,
+                    context_hash=excluded.context_hash,
+                    glossary_terms_json=excluded.glossary_terms_json;
+                """,
+                (
+                    cache_key,
+                    project_id,
+                    segment_id,
+                    source_text,
+                    target_text,
+                    model_name,
+                    runtime,
+                    json.dumps(parameters),
+                    context_hash,
+                    json.dumps(glossary_terms or []),
+                ),
+            )
+
+    def get_translation_cache(self, cache_key: str) -> dict[str, Any] | None:
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT * FROM translation_cache
+                WHERE cache_key = ?
+                LIMIT 1;
+                """,
+                (cache_key,),
+            )
+            r = cur.fetchone()
+            if not r:
+                return None
+            return {
+                "cache_key": r["cache_key"],
+                "project_id": r["project_id"],
+                "segment_id": r["segment_id"],
+                "source_text": r["source_text"],
+                "target_text": r["target_text"],
+                "model_name": r["model_name"],
+                "runtime": r["runtime"],
+                "parameters": json.loads(r["parameters_json"] or "{}"),
+                "context_hash": r["context_hash"],
+                "glossary_terms": json.loads(r["glossary_terms_json"] or "[]"),
+                "created_at": str(r["created_at"]),
+            }
+        finally:
+            cur.close()
+
+    def invalidate_cache_by_glossary_term(self, project_id: str, glossary_term: str) -> list[str]:
+        """Invalida o cache e reverte para pending apenas os segmentos afetados pelo termo de glossário."""
+        pattern = re.compile(rf"\b{re.escape(glossary_term)}\b", re.IGNORECASE)
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT s.id, s.original_text
+                FROM segments s
+                JOIN chapters c ON s.chapter_id = c.id
+                JOIN documents d ON c.document_id = d.id
+                WHERE d.project_id = ?;
+                """,
+                (project_id,),
+            )
+            affected_ids = [
+                row["id"] for row in cur.fetchall() if pattern.search(row["original_text"])
+            ]
+        finally:
+            cur.close()
+
+        if not affected_ids:
+            return []
+
+        with transaction(self.conn) as cur:
+            placeholders = ",".join("?" for _ in affected_ids)
+            cur.execute(
+                f"DELETE FROM translation_cache WHERE segment_id IN ({placeholders});",
+                affected_ids,
+            )
+            cur.execute(
+                f"""
+                UPDATE segments
+                SET status = 'pending', translated_text = '', updated_at = CURRENT_TIMESTAMP
+                WHERE id IN ({placeholders});
+                """,
+                affected_ids,
+            )
+        return affected_ids
 
     def save_revision(
         self,
@@ -1288,6 +2194,7 @@ class SQLiteDatabase(DatabaseInterface):
     # -------------------------------------------------------------------------
     def save_qa_report(self, report: QAReport) -> None:
         with transaction(self.conn) as cur:
+            cur.execute("DELETE FROM qa_issues WHERE segment_id = ?;", (report.segment_id,))
             for idx, issue in enumerate(report.issues, start=1):
                 issue_id = f"qa_{report.segment_id}_{idx}"
                 cur.execute(
@@ -1308,6 +2215,84 @@ class SQLiteDatabase(DatabaseInterface):
                         issue.suggested_fix,
                     ),
                 )
+
+    def get_qa_issues(self, segment_id: str) -> list[QAIssue]:
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT check_type, severity, description, original_snippet,
+                       translated_snippet, suggested_fix
+                FROM qa_issues
+                WHERE segment_id = ?
+                ORDER BY rowid ASC;
+                """,
+                (segment_id,),
+            )
+            rows = cur.fetchall()
+            return [
+                QAIssue(
+                    check_type=row["check_type"],
+                    severity=IssueSeverity(row["severity"]),
+                    description=row["description"],
+                    original_snippet=row["original_snippet"] or "",
+                    translated_snippet=row["translated_snippet"] or "",
+                    suggested_fix=row["suggested_fix"],
+                )
+                for row in rows
+            ]
+        finally:
+            cur.close()
+
+    def save_qa_fix_audit(self, audit: QAFixAuditRecord) -> None:
+        with transaction(self.conn) as cur:
+            cur.execute(
+                """
+                INSERT INTO qa_fix_audits (
+                    id, segment_id, check_type, old_text, new_text,
+                    rule_applied, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    audit.id,
+                    audit.segment_id,
+                    audit.check_type,
+                    audit.old_text,
+                    audit.new_text,
+                    audit.rule_applied,
+                    json.dumps(audit.metadata),
+                ),
+            )
+
+    def get_qa_fix_audits(self, segment_id: str) -> list[QAFixAuditRecord]:
+        cur = self.conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT id, segment_id, check_type, old_text, new_text,
+                       rule_applied, metadata_json, created_at
+                FROM qa_fix_audits
+                WHERE segment_id = ?
+                ORDER BY created_at ASC, rowid ASC;
+                """,
+                (segment_id,),
+            )
+            rows = cur.fetchall()
+            return [
+                QAFixAuditRecord(
+                    id=row["id"],
+                    segment_id=row["segment_id"],
+                    check_type=row["check_type"],
+                    old_text=row["old_text"],
+                    new_text=row["new_text"],
+                    rule_applied=row["rule_applied"],
+                    timestamp=str(row["created_at"]),
+                    metadata=json.loads(row["metadata_json"] or "{}"),
+                )
+                for row in rows
+            ]
+        finally:
+            cur.close()
 
     # -------------------------------------------------------------------------
     # Checkpoints e Eventos

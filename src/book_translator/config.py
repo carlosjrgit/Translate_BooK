@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -10,14 +12,79 @@ HardwareProfile = Literal["economy", "balanced", "quality", "custom"]
 
 
 @dataclass
+class DataDirs:
+    """Diretórios canônicos de armazenamento da aplicação."""
+
+    projects_dir: Path
+    models_dir: Path
+    cache_dir: Path
+    logs_dir: Path
+    app_dir: Path | None = None
+
+    def __iter__(self):
+        return iter((self.projects_dir, self.models_dir, self.cache_dir, self.logs_dir))
+
+    def __getitem__(self, idx):
+        return (self.projects_dir, self.models_dir, self.cache_dir, self.logs_dir)[idx]
+
+
+def get_default_data_dirs() -> DataDirs:
+    """Retorna os caminhos canônicos padrão separando executável, dados do usuário e modelos.
+
+    Regra de isolamento Windows:
+    - Executável: Diretório de instalação do programa (app_dir).
+    - Projetos do usuário: %APPDATA%/Translate_BooK/projects (preservados em desinstalações/upgrades).
+    - Modelos e Pesos: %LOCALAPPDATA%/Translate_BooK/models (separados do binário, pesados).
+    - Cache e Logs: %LOCALAPPDATA%/Translate_BooK/cache e logs.
+    - Portátil: se houver 'portable.txt' ou flag de ambiente, tudo reside junto do executável.
+    """
+    is_frozen = getattr(sys, "frozen", False)
+    app_dir = Path(sys.executable).parent if is_frozen else Path.cwd()
+    portable_marker = app_dir / "portable.txt"
+
+    if portable_marker.exists() or os.environ.get("TRANSLATE_BOOK_PORTABLE") == "1":
+        base = app_dir
+        return DataDirs(
+            projects_dir=base / "projects",
+            models_dir=base / "models",
+            cache_dir=base / "cache",
+            logs_dir=base / "logs",
+            app_dir=app_dir,
+        )
+
+    if is_frozen and sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if appdata and localappdata:
+            roaming = Path(appdata) / "Translate_BooK"
+            local = Path(localappdata) / "Translate_BooK"
+            return DataDirs(
+                projects_dir=roaming / "projects",
+                models_dir=local / "models",
+                cache_dir=local / "cache",
+                logs_dir=local / "logs",
+                app_dir=app_dir,
+            )
+
+    base = Path.cwd()
+    return DataDirs(
+        projects_dir=base / "projects",
+        models_dir=base / "models",
+        cache_dir=base / "cache",
+        logs_dir=base / "logs",
+        app_dir=app_dir,
+    )
+
+
+@dataclass
 class AppConfig:
     """Configurações centrais do BookTranslator."""
 
     base_dir: Path = field(default_factory=lambda: Path.cwd())
-    projects_dir: Path = field(default_factory=lambda: Path.cwd() / "projects")
-    models_dir: Path = field(default_factory=lambda: Path.cwd() / "models")
-    cache_dir: Path = field(default_factory=lambda: Path.cwd() / "cache")
-    logs_dir: Path = field(default_factory=lambda: Path.cwd() / "logs")
+    projects_dir: Path = field(default_factory=lambda: get_default_data_dirs()[0])
+    models_dir: Path = field(default_factory=lambda: get_default_data_dirs()[1])
+    cache_dir: Path = field(default_factory=lambda: get_default_data_dirs()[2])
+    logs_dir: Path = field(default_factory=lambda: get_default_data_dirs()[3])
 
     # Hardware & Performance
     hardware_profile: HardwareProfile = "balanced"

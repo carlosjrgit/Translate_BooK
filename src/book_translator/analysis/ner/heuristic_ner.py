@@ -140,7 +140,8 @@ CAPITALIZED_NAME_REGEX = re.compile(
     r"\b([A-ZÀ-Ý][a-zA-ZÀ-ÿ]+(?:\s+(?:von|van|de|da|Mc|Mac|O')?[A-ZÀ-Ý][a-zA-ZÀ-ÿ]+){1,2})\b"
 )
 
-NON_PERSON_POSSESSIVES = {
+NON_PERSON_WORDS = {
+    # Pronomes e determinantes
     "it",
     "there",
     "that",
@@ -149,6 +150,26 @@ NON_PERSON_POSSESSIVES = {
     "who",
     "let",
     "one",
+    "this",
+    "these",
+    "those",
+    "which",
+    "whose",
+    "whom",
+    "where",
+    "when",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "both",
+    "neither",
+    "either",
+    "some",
+    "any",
+    "none",
+    # Temporais e substantivos comuns de ambiente/época
     "today",
     "yesterday",
     "tomorrow",
@@ -158,6 +179,9 @@ NON_PERSON_POSSESSIVES = {
     "month",
     "day",
     "night",
+    "morning",
+    "afternoon",
+    "evening",
     "country",
     "city",
     "government",
@@ -171,6 +195,75 @@ NON_PERSON_POSSESSIVES = {
     "spring",
     "autumn",
     "fall",
+    # Advérbios de modo e transições comuns de início de frase (EN)
+    "suddenly",
+    "meanwhile",
+    "however",
+    "naturally",
+    "perhaps",
+    "immediately",
+    "eventually",
+    "unfortunately",
+    "clearly",
+    "certainly",
+    "surely",
+    "finally",
+    "indeed",
+    "actually",
+    "consequently",
+    "afterwards",
+    "presently",
+    "earlier",
+    "later",
+    "outside",
+    "inside",
+    "upstairs",
+    "downstairs",
+    "slowly",
+    "quickly",
+    "carefully",
+    "quietly",
+    "gently",
+    "softly",
+    "loudly",
+    "instantly",
+    "always",
+    "never",
+    "sometimes",
+    "often",
+    "usually",
+    "fortunately",
+    "surprisingly",
+    "truly",
+    "simply",
+    "directly",
+    "gradually",
+    "then",
+    "after",
+    "before",
+    "while",
+    "since",
+    "until",
+    "although",
+    "though",
+    "even",
+    "just",
+    "soon",
+    "now",
+    "again",
+    "still",
+    "already",
+    "almost",
+    "nearly",
+    "together",
+    "anyway",
+    "besides",
+    "moreover",
+    "furthermore",
+    "nonetheless",
+    "nevertheless",
+    "otherwise",
+    # Equivalentes em Português
     "ele",
     "ela",
     "isto",
@@ -179,7 +272,31 @@ NON_PERSON_POSSESSIVES = {
     "hoje",
     "ontem",
     "amanhã",
+    "então",
+    "depois",
+    "antes",
+    "quando",
+    "enquanto",
+    "repentinamente",
+    "subitamente",
+    "certamente",
+    "realmente",
+    "naturalmente",
+    "infelizmente",
+    "felizmente",
+    "claramente",
+    "lentamente",
+    "rapidamente",
+    "silenciosamente",
+    "sempre",
+    "nunca",
+    "às vezes",
+    "frequentemente",
+    "apenas",
+    "quase",
 }
+
+NON_PERSON_POSSESSIVES = NON_PERSON_WORDS
 
 POSSESSIVE_NAME_REGEX = re.compile(r"\b([A-ZÀ-Ý][a-zA-ZÀ-ÿ]+)'s\b")
 SPEECH_AFTER_REGEX = re.compile(rf"\b([A-ZÀ-Ý][a-zA-ZÀ-ÿ]+)\s+(?:{'|'.join(SPEECH_VERBS_SET)})\b")
@@ -250,6 +367,21 @@ class HeuristicNER(NERInterface):
             entity_str = match.group(1)
             words = entity_str.split()
             words_lower = [w.lower() for w in words]
+
+            # Poda de falsos positivos: se a primeira palavra for advérbio/conector inicial, apara ou ignora
+            if words_lower[0] in NON_PERSON_WORDS:
+                if len(words) > 1 and words_lower[1] not in NON_PERSON_WORDS:
+                    prefix_len = len(words[0]) + 1
+                    entity_str = " ".join(words[1:])
+                    words = words[1:]
+                    words_lower = words_lower[1:]
+                    span = (span[0] + prefix_len, span[1])
+                else:
+                    continue
+
+            # Se todas as palavras forem não-pessoas, ignora
+            if all(w in NON_PERSON_WORDS for w in words_lower):
+                continue
 
             # Heurística de Organização (precedência sobre localização)
             if any(w in ORGANIZATION_KEYWORDS for w in words_lower):

@@ -32,6 +32,12 @@ from book_translator.errors import ParsingError
 from book_translator.logging import get_logger
 from book_translator.parsers.base import BaseParser
 from book_translator.parsers.normalization import detect_encoding, normalize_unicode
+from book_translator.security import (
+    SecurityError,
+    safe_parse_xml,
+    validate_file_size_limit,
+    validate_zip_archive,
+)
 
 logger = get_logger("parsers.epub")
 
@@ -63,10 +69,10 @@ class EpubParser(BaseParser):
     def parse(self, file_path: Path | str, title: str | None = None) -> Document:
         path = self.validate_source_file(file_path)
 
-        if not zipfile.is_zipfile(path):
-            raise ParsingError(f"Arquivo EPUB corrompido ou formato inválido: '{path.name}'")
-
         try:
+            validate_file_size_limit(path)
+            validate_zip_archive(path)
+
             with zipfile.ZipFile(path, "r") as zf:
                 namelist = zf.namelist()
 
@@ -79,9 +85,9 @@ class EpubParser(BaseParser):
 
                 container_xml = zf.read("META-INF/container.xml")
                 try:
-                    c_root = ET.fromstring(container_xml)
-                except ET.ParseError as e:
-                    raise ParsingError(f"XML corrompido em 'META-INF/container.xml': {e}") from e
+                    c_root = safe_parse_xml(container_xml)
+                except (ET.ParseError, SecurityError) as e:
+                    raise ParsingError(f"XML corrompido ou inseguro em 'META-INF/container.xml': {e}") from e
 
                 rootfile_el = c_root.find(f".//{NS_CONTAINER}rootfile")
                 if rootfile_el is None or not rootfile_el.get("full-path"):
@@ -100,9 +106,10 @@ class EpubParser(BaseParser):
                 # 2. Leitura e parsing do pacote OPF
                 opf_xml = zf.read(opf_path)
                 try:
-                    opf_root = ET.fromstring(opf_xml)
-                except ET.ParseError as e:
-                    raise ParsingError(f"XML corrompido no arquivo OPF '{opf_path}': {e}") from e
+                    opf_root = safe_parse_xml(opf_xml)
+                except (ET.ParseError, SecurityError) as e:
+                    raise ParsingError(f"XML corrompido ou inseguro no arquivo OPF '{opf_path}': {e}") from e
+
 
                 epub_version = opf_root.get("version", "2.0")
 
@@ -271,6 +278,8 @@ class EpubParser(BaseParser):
                 doc.chapters = chapters
                 return doc
 
+        except SecurityError as e:
+            raise ParsingError(f"Arquivo EPUB corrompido ou violou políticas de segurança: {e}") from e
         except zipfile.BadZipFile as e:
             raise ParsingError(f"Arquivo EPUB corrompido ou truncado: '{path.name}'") from e
         except ParsingError:

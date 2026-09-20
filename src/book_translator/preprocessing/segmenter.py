@@ -63,6 +63,10 @@ class InitialSegmenter:
                 "word_count": len(text.split()),
                 "char_count": len(text),
             }
+            if hasattr(unit, "metadata") and unit.metadata.get("is_ocr"):
+                meta["is_ocr"] = True
+                meta["ocr_confidence"] = unit.metadata.get("ocr_confidence")
+                meta["ocr_engine"] = unit.metadata.get("ocr_engine")
             if extra_meta:
                 meta.update(extra_meta)
 
@@ -149,10 +153,16 @@ class InitialSegmenter:
                 if self.config.group_short_paragraphs:
                     grouped_paras: list[Paragraph] = [unit]
                     current_words = len((unit.normalized_text or unit.raw_text).split())
+                    unit_is_ocr = bool(getattr(unit, "metadata", {}).get("is_ocr"))
 
                     next_idx = idx + 1
                     while next_idx < total_units and isinstance(reading_units[next_idx], Paragraph):
                         next_p = reading_units[next_idx]
+                        next_is_ocr = bool(getattr(next_p, "metadata", {}).get("is_ocr"))
+                        if unit_is_ocr != next_is_ocr:
+                            # Não mistura parágrafos de OCR com parágrafos textuais puros
+                            break
+
                         p_words = len((next_p.normalized_text or next_p.raw_text).split())
 
                         # Se o acúmulo ultrapassar o limite, para o agrupamento
@@ -162,6 +172,7 @@ class InitialSegmenter:
                         grouped_paras.append(next_p)
                         current_words += p_words
                         next_idx += 1
+
 
                     if len(grouped_paras) > 1:
                         combined_text = "\n\n".join(

@@ -1,0 +1,170 @@
+[
+  {
+    "id": "valid_01",
+    "category": "valid_translation",
+    "source": "Dr. John Watson sat near the fireplace at 221B Baker Street, listening carefully.",
+    "target": "O Dr. John Watson sentou-se perto da lareira na Baker Street, 221B, ouvindo atentamente.",
+    "expected_issue": null
+  },
+  {
+    "id": "valid_02",
+    "category": "valid_translation",
+    "source": "Sherlock Holmes examined the footprint with his magnifying glass.",
+    "target": "Sherlock Holmes analisou a pegada através de sua lupa.",
+    "expected_issue": null
+  },
+  {
+    "id": "valid_03",
+    "category": "valid_translation",
+    "source": "'The thief was hasty,' said Holmes.",
+    "target": "— O ladrão foi apressado — afirmou Holmes.",
+    "expected_issue": null
+  },
+  {
+    "id": "valid_04",
+    "category": "valid_translation",
+    "source": "The train arrived at Dartmoor under heavy rain and ominous thunder.",
+    "target": "O trem alcançou Dartmoor sob tempestade intensa e trovões ameaçadores.",
+    "expected_issue": null
+  },
+  {
+    "id": "valid_05",
+    "category": "valid_translation",
+    "source": "She was trembling with fear in the cold corridor.",
+    "target": "Ela tremia de pavor no corredor gélido.",
+    "expected_issue": null
+  },
+  {
+    "id": "valid_06",
+    "category": "valid_translation",
+    "source": "He carefully inspected the ancient brass lock on the mahogany door.",
+    "target": "Ele examinou com cautela a velha fechadura de latão na porta de mogno.",
+    "expected_issue": null
+  },
+  {
+    "id": "valid_07",
+    "category": "valid_translation",
+    "source": "The witness confirmed the statement before the magistrate.",
+    "target": "A testemunha confirmou o depoimento perante o magistrado.",
+    "expected_issue": null
+  },
+  {
+    "id": "valid_08",
+    "category": "valid_translation",
+    "source": "Inspector Lestrade had sent an urgent telegram regarding the blackwood sapphire.",
+    "target": "O inspetor Lestrade despachara um telegrama urgente relativo à safira de Blackwood.",
+    "expected_issue": null
+  },
+  {
+    "id": "omission_01",
+    "category": "omission",
+    "source": "The sapphire vanished at midnight from the heavy iron safe in the master bedroom.",
+    "target": "A safira sumiu.",
+    "expected_issue": "semantic_omission"
+  },
+  {
+    "id": "omission_02",
+    "category": "omission",
+    "source": "Sherlock Holmes and Dr. Watson walked through the foggy streets of London discussing the strange disappearance of Lord Blackwood.",
+    "target": "Eles caminharam.",
+    "expected_issue": "semantic_omission"
+  },
+  {
+    "id": "addition_01",
+    "category": "addition",
+    "source": "She looked out the window.",
+    "target": "Ela olhou pela janela contemplando os vastos campos verdes onde os cavalos pastavam alegremente sob a luz dourada do sol poente de outono.",
+    "expected_issue": "semantic_addition"
+  },
+  {
+    "id": "meaning_reversal_01",
+    "category": "meaning_reversal",
+    "source": "The prisoner was found guilty by the jury.",
+    "target": "O prisioneiro foi considerado inocente pelo júri.",
+    "expected_issue": "meaning_reversal"
+  },
+  {
+    "id": "meaning_reversal_02",
+    "category": "meaning_reversal",
+    "source": "The governor approved the expedition into the unknown jungle.",
+    "target": "O governador rejeitou a expedição para a selva desconhecida.",
+    "expected_issue": "meaning_reversal"
+  },
+  {
+    "id": "polarity_inversion_01",
+    "category": "meaning_reversal",
+    "source": "Holmes did not touch the weapon on the table.",
+    "target": "Holmes tocou na arma sobre a mesa.",
+    "expected_issue": "polarity_inversion"
+  },
+  {
+    "id": "polarity_inversion_02",
+    "category": "meaning_reversal",
+    "source": "The butler remembered the exact time of arrival.",
+    "target": "O mordomo não se lembrou do horário exato de chegada.",
+    "expected_issue": "polarity_inversion"
+  },
+  {
+    "id": "subject_shift_01",
+    "category": "subject_shift",
+    "source": "Holmes asked Watson about the mysterious footprint.",
+    "target": "Watson perguntou a Holmes sobre a pegada misteriosa.",
+    "expected_issue": "subject_shift"
+  },
+  {
+    "id": "subject_shift_02",
+    "category": "subject_shift",
+    "source": "He stared into the darkness.",
+    "target": "Ela encarou a escuridão.",
+    "expected_issue": "subject_shift"
+  },
+  {
+    "id": "intensity_loss_01",
+    "category": "intensity_loss",
+    "source": "Lord Blackwood was furious when the safe was opened.",
+    "target": "Lord Blackwood estava chateado quando o cofre foi aberto.",
+    "expected_issue": "intensity_loss"
+  },
+  {
+    "id": "intensity_loss_02",
+    "category": "intensity_loss",
+    "source": "Lady Margaret was terrified by the ghostly hound.",
+    "target": "Lady Margaret estava preocupada com o cão fantasmagórico.",
+    "expected_issue": "intensity_loss"
+  },
+  {
+    "id": "intensity_loss_03",
+    "category": "intensity_loss",
+    "source": "He suffered excruciating pain in his injured leg.",
+    "target": "Ele sentiu dor incômoda na perna machucada.",
+    "expected_issue": "intensity_loss"
+  },
+  {
+    "id": "problematic_literal_01",
+    "category": "problematic_literal",
+    "source": "Actually, the thief did not leave through the main garden door.",
+    "target": "Atualmente, o ladrão não saiu pela porta principal do jardim.",
+    "expected_issue": "problematic_literal_translation"
+  },
+  {
+    "id": "problematic_literal_02",
+    "category": "problematic_literal",
+    "source": "He did not realize that the footprints belonged to a hound.",
+    "target": "Ele não realizou que as pegadas pertenciam a um cão de caça.",
+    "expected_issue": "problematic_literal_translation"
+  },
+  {
+    "id": "problematic_literal_03",
+    "category": "problematic_literal",
+    "source": "His parents lived in Dartmoor for many decades.",
+    "target": "Seus parentes viveram em Dartmoor por muitas décadas.",
+    "expected_issue": "problematic_literal_translation"
+  },
+  {
+    "id": "problematic_literal_04",
+    "category": "problematic_literal",
+    "source": "Eventually, the inspector understood the truth.",
+    "target": "Eventualmente, o inspetor compreendeu a verdade.",
+    "expected_issue": "problematic_literal_translation"
+  }
+]

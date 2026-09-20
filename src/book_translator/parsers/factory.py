@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from book_translator.core.document import Document
 from book_translator.errors import IngestionError
@@ -46,7 +47,20 @@ def get_parser_for_file(file_path: Path | str) -> ParserInterface:
     return get_parser_for_format(detected_fmt)
 
 
+def create_parser(
+    file_path: Path | str,
+    ocr_service: Any | None = None,
+) -> ParserInterface:
+    """Fábrica de parser que detecta formato e injeta serviço de OCR se aplicável."""
+    inspector = IngestionInspector()
+    detected_fmt = inspector.detect_format(file_path)
+    if detected_fmt == "pdf":
+        return PdfParser(ocr_service=ocr_service)
+    return get_parser_for_format(detected_fmt)
+
+
 def parse_document(file_path: Path | str, title: str | None = None) -> Document:
     """Ponto de entrada de alto nível: detecta formato e gera o Document canônico."""
     parser = get_parser_for_file(file_path)
     return parser.parse(file_path, title=title)
+

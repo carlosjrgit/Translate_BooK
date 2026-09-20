@@ -10,7 +10,10 @@ from book_translator.memory.base import (
     GlossaryEntry,
     LockedVerificationResult,
     MemoryManagerInterface,
+    StoryContextSnapshot,
+    StoryMemory,
     StyleBible,
+    StyleViolation,
     TranslationMemoryEntry,
 )
 from book_translator.memory.character_memory import CharacterMemory
@@ -19,7 +22,7 @@ from book_translator.memory.translation_memory import TranslationMemory
 
 
 class MemoryManager(MemoryManagerInterface):
-    """Fachada unificada para controle de Characters, TM, Glossary, StyleBible e auditoria."""
+    """Fachada unificada para controle de Characters, TM, Glossary, StyleBible, StoryMemory e auditoria."""
 
     def __init__(self, project_id: str = "default", db: Any = None) -> None:
         self.project_id = project_id
@@ -28,11 +31,16 @@ class MemoryManager(MemoryManagerInterface):
         self.glossary = Glossary(project_id=project_id, db=db)
         self.tm = TranslationMemory(project_id=project_id, db=db)
         self._style_bible: StyleBible = StyleBible()
+        self.story: StoryMemory = StoryMemory(project_id=project_id)
 
         if self.db:
             sb = self.db.get_style_bible(project_id)
             if sb:
                 self._style_bible = sb
+            if hasattr(self.db, "get_story_memory"):
+                loaded_story = self.db.get_story_memory(project_id)
+                if loaded_story:
+                    self.story = loaded_story
 
     # --- Character Memory ---
     def add_character(self, character: CharacterEntry) -> None:
@@ -78,6 +86,56 @@ class MemoryManager(MemoryManagerInterface):
         """Alias para save_style_bible."""
         self.save_style_bible(style_bible)
 
+    # --- Story / Context Memory ---
+    @property
+    def story_memory(self) -> StoryMemory:
+        """Acesso direto à StoryMemory atual."""
+        return self.story
+
+    def get_story_memory(self) -> StoryMemory:
+        """Recupera a StoryMemory gerenciada."""
+        return self.story
+
+    def save_story_memory(self, story_memory: StoryMemory | None = None) -> None:
+        """Salva a StoryMemory no banco do projeto."""
+        if story_memory is not None:
+            self.story = story_memory
+        if self.db and hasattr(self.db, "save_story_memory"):
+            self.db.save_story_memory(self.project_id, self.story)
+
+    def get_story_context(
+        self,
+        chapter_id: str,
+        unit_id: str,
+        character_ids: list[str] | None = None,
+        max_facts: int = 5,
+        max_events: int = 3,
+    ) -> StoryContextSnapshot:
+        """Recupera o recorte cirúrgico de contexto da história para o segmento atual."""
+        return self.story.get_scene_context_snapshot(
+            chapter_id=chapter_id,
+            unit_id=unit_id,
+            character_ids=character_ids,
+            max_facts=max_facts,
+            max_events=max_events,
+        )
+
+    # --- QA de Estilo e Continuidade ---
+    def validate_style(self, target_text: str, source_text: str = "") -> list[StyleViolation]:
+        """Executa validação programática de aderência à Style Bible."""
+        return self._style_bible.validate_text(target_text, source_text=source_text)
+
+    def validate_character_continuity(
+        self, character_id: str, chapter_id: str, text: str, order_index: int = 0
+    ) -> list[Any]:
+        """Valida continuidade de ações do personagem contra seu estado prévio."""
+        return self.story.validate_character_continuity(
+            character_id=character_id,
+            chapter_id=chapter_id,
+            text=text,
+            order_index=order_index,
+        )
+
     # --- Verificações Cruzadas e Conformidade ---
     def verify_all_locked_terms(
         self, source_text: str, target_text: str
@@ -96,11 +154,29 @@ class MemoryManager(MemoryManagerInterface):
         )
 
     def detect_all_conflicts(self) -> list[ConflictReport]:
-        """Detecta conflitos internos e colisões entre o Glossário e a Translation Memory."""
+        """Detecta conflitos internos e colisões entre o Glossário, TM, Style Bible e Story Memory."""
         conflicts: list[ConflictReport] = []
         conflicts.extend(self.characters.detect_conflicts())
         conflicts.extend(self.glossary.detect_conflicts())
         conflicts.extend(self.tm.detect_conflicts())
+        conflicts.extend(self._style_bible.detect_contradictions())
+
+        for anomaly in self.story.detect_contradictions():
+            conflicts.append(
+                ConflictReport(
+                    memory_type="story_memory",
+                    term_or_name=anomaly.entity_id or anomaly.anomaly_type,
+                    existing_value=anomaly.conflicting_with or "",
+                    conflicting_value=anomaly.evidence or "",
+                    reason=anomaly.description,
+                    severity=anomaly.severity,
+                    details={
+                        "anomaly_type": anomaly.anomaly_type,
+                        "chapter_id": anomaly.chapter_id,
+                        "order_index": anomaly.order_index,
+                    },
+                )
+            )
 
         # Detecção de colisões cruzadas entre Glossário e TM:
         # Se um termo tem traduções conflitantes estabelecidas em ambas as memórias

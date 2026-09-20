@@ -19,7 +19,7 @@ from book_translator.analysis.ner.interface import NERInterface, RawEntityMentio
 from book_translator.analysis.relation_extractor import RelationExtractor
 from book_translator.core.models import Document
 from book_translator.logging import get_logger
-from book_translator.memory.base import CharacterEntry, StyleBible
+from book_translator.memory.base import CharacterEntry, StoryMemory, StyleBible, StyleEvidence
 
 logger = get_logger("analysis.book_analyzer")
 
@@ -296,10 +296,56 @@ class BookAnalyzer(AnalyzerInterface):
 
         count_1st_person = 0
         count_3rd_person = 0
+        evidences_1st_person: list[str] = []
+        evidences_3rd_person: list[str] = []
+
+        count_past_tense = 0
+        count_present_tense = 0
+        evidences_past: list[str] = []
+        evidences_present: list[str] = []
+
+        count_em_dash = 0
+        count_quotes = 0
+        evidences_dialogue: list[str] = []
+
+        evidences_profanity: list[str] = []
+        evidences_titles: list[str] = []
+        evidences_treatment: list[str] = []
+
+        re_past = re.compile(
+            r"\b(was|were|had|said|looked|went|walked|came|saw|thought|asked|replied|took|felt)\b",
+            re.IGNORECASE,
+        )
+        re_present = re.compile(
+            r"\b(is|are|has|says|looks|goes|walks|comes|sees|thinks|asks|replies|takes|feels)\b",
+            re.IGNORECASE,
+        )
+        re_titles = re.compile(
+            r"\b(Lord|Lady|Sir|Count|Countess|Duke|Duchess|Baron|Baroness|King|Queen|Prince|Princess|Captain|Doctor|Professor)\b",
+            re.IGNORECASE,
+        )
+        re_profanity = re.compile(
+            r"\b(fuck|shit|damn|bastard|bitch|asshole)\b",
+            re.IGNORECASE,
+        )
+        re_treatment = re.compile(
+            r"\b(Mr\.|Mrs\.|Miss|Ms\.|Sir|Lord|Lady|you|thou|thee)\b",
+            re.IGNORECASE,
+        )
+
+        chapters_meta: list[dict[str, Any]] = []
 
         # 1. Varre capítulos e unidades coletando menções e dados linguísticos
         for chapter in document.chapters:
             reading_units = chapter.get_reading_sequence()
+            chapters_meta.append(
+                {
+                    "chapter_id": chapter.id,
+                    "title": chapter.title or chapter.id,
+                    "order_index": getattr(chapter, "order", getattr(chapter, "order_index", 0)),
+                    "units_count": len(reading_units),
+                }
+            )
 
             for unit in reading_units:
                 text = getattr(unit, "normalized_text", getattr(unit, "raw_text", ""))
@@ -318,11 +364,48 @@ class BookAnalyzer(AnalyzerInterface):
                     if t not in ENGLISH_STOPWORDS:
                         word_counts[t] += 1
 
-                # Contagem de pronomes na narrativa para estimativa do narrador
-                # Não conta diálogos para não confundir fala em 1ª pessoa com narrador
+                # Contagem de pronomes e tempos na narrativa para estimativa de narrador/estilo
                 if getattr(unit, "__class__", None).__name__ == "Paragraph":
-                    count_1st_person += len(PRONOUN_1ST_PERSON.findall(text))
-                    count_3rd_person += len(PRONOUN_3RD_PERSON.findall(text))
+                    m1 = PRONOUN_1ST_PERSON.findall(text)
+                    m3 = PRONOUN_3RD_PERSON.findall(text)
+                    count_1st_person += len(m1)
+                    count_3rd_person += len(m3)
+                    if m1 and len(evidences_1st_person) < 5:
+                        evidences_1st_person.append(text[:120])
+                    if m3 and len(evidences_3rd_person) < 5:
+                        evidences_3rd_person.append(text[:120])
+
+                    past_m = re_past.findall(text)
+                    pres_m = re_present.findall(text)
+                    count_past_tense += len(past_m)
+                    count_present_tense += len(pres_m)
+                    if past_m and len(evidences_past) < 5:
+                        evidences_past.append(text[:120])
+                    if pres_m and len(evidences_present) < 5:
+                        evidences_present.append(text[:120])
+
+                # Padrão de diálogo
+                trimmed = text.strip()
+                if trimmed.startswith(("—", "–", "- ")):
+                    count_em_dash += 1
+                    if len(evidences_dialogue) < 5:
+                        evidences_dialogue.append(trimmed[:120])
+                elif trimmed.startswith('"'):
+                    count_quotes += 1
+                    if len(evidences_dialogue) < 5:
+                        evidences_dialogue.append(trimmed[:120])
+
+                prof_m = re_profanity.findall(text)
+                if prof_m and len(evidences_profanity) < 5:
+                    evidences_profanity.append(text[:120])
+
+                title_m = re_titles.findall(text)
+                if title_m and len(evidences_titles) < 5:
+                    evidences_titles.append(text[:120])
+
+                treat_m = re_treatment.findall(text)
+                if treat_m and len(evidences_treatment) < 5:
+                    evidences_treatment.append(text[:120])
 
         # 2. Resolução de aliases e desambiguação de homônimos
         entities: list[AnalyzedEntity] = self.alias_resolver.resolve(all_mentions)
@@ -345,11 +428,40 @@ class BookAnalyzer(AnalyzerInterface):
                     )
                     all_relationships.extend(rels)
 
-        # 5. Estimativa de narrador predominante
+        # 5. Estimativa de narrador predominante e pessoa narrativa
         if count_1st_person > count_3rd_person * 0.7:
             predominant_narrator = "primeira pessoa"
+            narrative_person = "1ª pessoa"
+            narrator_evidences = evidences_1st_person or evidences_3rd_person
+            narrator_conf = min(
+                0.95, 0.6 + (count_1st_person / (count_1st_person + count_3rd_person + 1)) * 0.35
+            )
         else:
             predominant_narrator = "terceira pessoa"
+            narrative_person = "3ª pessoa"
+            narrator_evidences = evidences_3rd_person or evidences_1st_person
+            narrator_conf = min(
+                0.95, 0.6 + (count_3rd_person / (count_1st_person + count_3rd_person + 1)) * 0.35
+            )
+
+        # Tempo predominante
+        if count_past_tense >= count_present_tense:
+            predominant_tense = "passado"
+            tense_evidences = evidences_past
+            tense_conf = min(
+                0.95, 0.6 + (count_past_tense / (count_past_tense + count_present_tense + 1)) * 0.35
+            )
+        else:
+            predominant_tense = "presente"
+            tense_evidences = evidences_present
+            tense_conf = min(
+                0.95,
+                0.6 + (count_present_tense / (count_past_tense + count_present_tense + 1)) * 0.35,
+            )
+
+        # Padrão de diálogo
+        dialogue_style = "travessão"  # Padrão editorial brasileiro
+        dialogue_evs = evidences_dialogue or ["Convenção editorial padrão PT-BR com travessão"]
 
         # 6. Identificação de conceitos recorrentes (nomes de entidades frequentes)
         recurrent_concepts = [
@@ -399,6 +511,21 @@ class BookAnalyzer(AnalyzerInterface):
             metadata={
                 "total_entities_found": len(entities),
                 "total_relationships_found": len(all_relationships),
+                "chapters_meta": chapters_meta,
+                "style_dimensions": {
+                    "narrator": predominant_narrator,
+                    "narrator_conf": narrator_conf,
+                    "narrator_evidences": narrator_evidences,
+                    "narrative_person": narrative_person,
+                    "predominant_tense": predominant_tense,
+                    "tense_conf": tense_conf,
+                    "tense_evidences": tense_evidences,
+                    "dialogue_style": dialogue_style,
+                    "dialogue_evidences": dialogue_evs,
+                    "profanity_evidences": evidences_profanity,
+                    "titles_evidences": evidences_titles,
+                    "treatment_evidences": evidences_treatment,
+                },
             },
         )
 
@@ -413,8 +540,9 @@ class BookAnalyzer(AnalyzerInterface):
         report: AnalysisReport,
         db: Any,
         project_id: str,
+        document: Document | None = None,
     ) -> None:
-        """Grava as entidades e descobertas da análise diretamente no banco do projeto."""
+        """Grava as entidades, StyleBible e StoryMemory diretamente no banco do projeto."""
         for ent in report.entities:
             if ent.entity_type == EntityType.CHARACTER:
                 char_entry = CharacterEntry(
@@ -444,9 +572,149 @@ class BookAnalyzer(AnalyzerInterface):
                 )
                 db.save_entity(db_entity)
 
-        # Atualiza a bíblia de estilo com o narrador detectado
+        # 1. Popula StyleBible estruturada com evidências
+        style_dims = report.metadata.get("style_dimensions", {})
         sb = StyleBible(
             narrator=report.predominant_narrator,
+            narrative_person=style_dims.get("narrative_person", "terceira pessoa"),
+            predominant_tense=style_dims.get("predominant_tense", "passado"),
+            formality_level=report.formality_level,
+            dialogue_style=style_dims.get("dialogue_style", "travessão"),
+            profanity_handling="preservar intensidade do original",
+            treatment_forms="você",
+            editorial_punctuation="editorial brasileiro",
+            title_treatment="traduzir",
+            internal_conventions=[
+                "diálogos com travessão editorial",
+                "preservação de itálicos de ênfase",
+            ],
             register=report.formality_level,
+            project_id=str(project_id),
         )
+
+        # Registra regras com suas respectivas evidências textuais
+        if "narrator_evidences" in style_dims and style_dims["narrator_evidences"]:
+            sb.set_rule(
+                "narrator",
+                report.predominant_narrator,
+                confidence=style_dims.get("narrator_conf", 0.9),
+                evidences=[StyleEvidence(snippet=s) for s in style_dims["narrator_evidences"]],
+            )
+            sb.set_rule(
+                "narrative_person",
+                style_dims.get("narrative_person", "3ª pessoa"),
+                confidence=style_dims.get("narrator_conf", 0.9),
+                evidences=[StyleEvidence(snippet=s) for s in style_dims["narrator_evidences"]],
+            )
+
+        if "tense_evidences" in style_dims and style_dims["tense_evidences"]:
+            sb.set_rule(
+                "predominant_tense",
+                style_dims.get("predominant_tense", "passado"),
+                confidence=style_dims.get("tense_conf", 0.9),
+                evidences=[StyleEvidence(snippet=s) for s in style_dims["tense_evidences"]],
+            )
+
+        if "dialogue_evidences" in style_dims and style_dims["dialogue_evidences"]:
+            sb.set_rule(
+                "dialogue_style",
+                style_dims.get("dialogue_style", "travessão"),
+                confidence=0.9,
+                evidences=[StyleEvidence(snippet=s) for s in style_dims["dialogue_evidences"]],
+            )
+
+        if "profanity_evidences" in style_dims and style_dims["profanity_evidences"]:
+            sb.set_rule(
+                "profanity_handling",
+                "preservar intensidade do original",
+                confidence=1.0,
+                evidences=[StyleEvidence(snippet=s) for s in style_dims["profanity_evidences"]],
+            )
+
+        if "treatment_evidences" in style_dims and style_dims["treatment_evidences"]:
+            sb.set_rule(
+                "treatment_forms",
+                "você",
+                confidence=0.85,
+                evidences=[StyleEvidence(snippet=s) for s in style_dims["treatment_evidences"]],
+            )
+
+        if "titles_evidences" in style_dims and style_dims["titles_evidences"]:
+            sb.set_rule(
+                "title_treatment",
+                "traduzir",
+                confidence=0.9,
+                evidences=[StyleEvidence(snippet=s) for s in style_dims["titles_evidences"]],
+            )
+
         db.save_style_bible(project_id, sb)
+
+        # 2. Popula StoryMemory com resumos, estados e fatos
+        sm = StoryMemory(project_id=str(project_id))
+
+        # Cria resumos preliminares por capítulo
+        chapters_info = report.metadata.get("chapters_meta", [])
+        if document and document.chapters:
+            for ch in document.chapters:
+                units = ch.get_reading_sequence()
+                chars_here = [
+                    e.canonical_name
+                    for e in report.entities
+                    if e.entity_type == EntityType.CHARACTER
+                    and any(occ.chapter_id == ch.id for occ in e.occurrences)
+                ]
+                sm.record_summary(
+                    unit_id=ch.id,
+                    summary_text=f"Capítulo '{ch.title or ch.id}' ({len(units)} unidades de leitura).",
+                    title=ch.title or ch.id,
+                    unit_type="chapter",
+                    characters_present=chars_here,
+                    order_index=getattr(ch, "order", getattr(ch, "order_index", 0)),
+                )
+        elif chapters_info:
+            for cm in chapters_info:
+                cid = cm["chapter_id"]
+                sm.record_summary(
+                    unit_id=cid,
+                    summary_text=f"Capítulo '{cm['title']}' ({cm['units_count']} unidades de leitura).",
+                    title=cm["title"],
+                    unit_type="chapter",
+                    order_index=cm["order_index"],
+                )
+
+        # Registra estados iniciais dos personagens identificados
+        for ent in report.entities:
+            if ent.entity_type == EntityType.CHARACTER:
+                first_ch = ent.first_appearance_chapter or (
+                    chapters_info[0]["chapter_id"] if chapters_info else "ch_001"
+                )
+                sm.record_character_state(
+                    character_id=ent.id,
+                    chapter_id=first_ch,
+                    alive_status="alive",
+                    role_or_title=", ".join(ent.honorifics) if ent.honorifics else "",
+                    metadata={"canonical_name": ent.canonical_name, "gender": ent.gender},
+                )
+
+        # Registra relações extraídas
+        for rel in report.relationships:
+            sm.record_relationship(
+                source_character_id=rel.source_entity_id,
+                target_character_id=rel.target_entity_id,
+                relation_type=rel.relation_type,
+                description=rel.evidence,
+                chapter_id=rel.chapter_id,
+                evidence=rel.evidence,
+                confidence=rel.confidence,
+            )
+
+        # Registra conceitos recorrentes como fatos persistentes
+        for concept in report.recurrent_concepts:
+            sm.record_fact(
+                statement=f"Conceito ou elemento recorrente no universo da obra: '{concept}'.",
+                category="lore",
+                confidence=0.9,
+            )
+
+        if hasattr(db, "save_story_memory"):
+            db.save_story_memory(project_id, sm)
