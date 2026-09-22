@@ -10,7 +10,11 @@ from typing import Generator
 from book_translator.errors import DatabaseError
 
 
-def get_sqlite_connection(db_path: Path | str, timeout: float = 30.0) -> sqlite3.Connection:
+def get_sqlite_connection(
+    db_path: Path | str,
+    timeout: float = 30.0,
+    check_same_thread: bool = False,
+) -> sqlite3.Connection:
     """Cria e configura uma conexão SQLite com foreign keys ativadas e WAL mode."""
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -19,6 +23,7 @@ def get_sqlite_connection(db_path: Path | str, timeout: float = 30.0) -> sqlite3
         conn = sqlite3.connect(
             str(path),
             timeout=timeout,
+            check_same_thread=check_same_thread,
         )
         conn.row_factory = sqlite3.Row
 

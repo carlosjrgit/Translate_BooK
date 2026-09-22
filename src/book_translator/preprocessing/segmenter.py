@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from enum import Enum
+import re
 from typing import Any
+
 
 from book_translator.core.ids import compute_content_hash, generate_segment_id
 from book_translator.core.models import (
@@ -30,7 +32,72 @@ class SegmentType(str, Enum):
     FOOTNOTE = "footnote"
 
 
+COMMON_ABBREVIATIONS = {
+    "mr.", "mrs.", "ms.", "dr.", "prof.", "capt.", "col.", "gen.", "lt.",
+    "st.", "sr.", "jr.", "vs.", "etc.", "i.e.", "e.g.", "no.", "vol.", "p.", "pp."
+}
+
+
+def split_text_into_sentences(text: str) -> list[str]:
+    """Divide um texto em sentenças preservando 100% das palavras e sua ordem exata."""
+    if not text:
+        return []
+
+    split_indices = []
+    pattern = re.compile(r'([.!?]["\'”’)]?)\s+')
+    for m in pattern.finditer(text):
+        match_end = m.end()
+        preceding_text = text[: m.start(1) + 1].strip()
+        last_word = preceding_text.split()[-1].lower() if preceding_text.split() else ""
+        if last_word in COMMON_ABBREVIATIONS:
+            continue
+        if len(last_word.rstrip(".!?")) == 1:
+            continue
+        if match_end < len(text) and text[match_end] in "abcdefghijklmnopqrstuvwxyz":
+            continue
+        split_indices.append((m.start() + len(m.group(1)), match_end))
+
+    if not split_indices:
+        return [text]
+
+    sentences = []
+    prev_end = 0
+    for space_start, space_end in split_indices:
+        sentence = text[prev_end:space_start].strip()
+        if sentence:
+            sentences.append(sentence)
+        prev_end = space_end
+    last_sent = text[prev_end:].strip()
+    if last_sent:
+        sentences.append(last_sent)
+
+    return sentences
+
+
+def group_sentences_into_chunks(sentences: list[str], max_words: int = 100) -> list[str]:
+    """Agrupa sentenças consecutivas em blocos de até max_words palavras sem alterar a ordem."""
+    chunks: list[str] = []
+    current_chunk: list[str] = []
+    current_words = 0
+
+    for s in sentences:
+        s_words = len(s.split())
+        if current_chunk and (current_words + s_words > max_words):
+            chunks.append(" ".join(current_chunk))
+            current_chunk = [s]
+            current_words = s_words
+        else:
+            current_chunk.append(s)
+            current_words += s_words
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))
+
+    return chunks
+
+
 class InitialSegmenter:
+
     """Segmenta o conteúdo estruturado de capítulos em unidades semanticamente coerentes."""
 
     def __init__(self, config: PreprocessingConfig | None = None) -> None:
@@ -196,9 +263,36 @@ class InitialSegmenter:
                         idx = next_idx
                         continue
 
-                # Caso padrão: parágrafo individual
+                # Caso padrão: parágrafo individual (com refino de sentenças para textos longos)
                 raw_or_norm = unit.normalized_text or unit.raw_text
                 loc = [asdict(unit.source_location)] if unit.source_location else []
+
+                p_words = raw_or_norm.split()
+                if self.config.split_long_paragraphs and len(p_words) > self.config.max_segment_words:
+                    sentences = split_text_into_sentences(raw_or_norm)
+                    chunks = group_sentences_into_chunks(
+                        sentences, max_words=self.config.max_segment_words
+                    )
+                    if len(chunks) > 1:
+                        for part_idx, chunk_text in enumerate(chunks, 1):
+                            segments.append(
+                                create_segment(
+                                    text=chunk_text,
+                                    seg_type=SegmentType.PARAGRAPH,
+                                    unit_ids=[unit.id],
+                                    locations=loc,
+                                    primary_p_id=unit.id,
+                                    section_id=unit.section_id,
+                                    extra_meta={
+                                        "paragraph_split": True,
+                                        "part_index": part_idx,
+                                        "total_parts": len(chunks),
+                                    },
+                                )
+                            )
+                        idx += 1
+                        continue
+
                 segments.append(
                     create_segment(
                         text=raw_or_norm,
@@ -211,6 +305,7 @@ class InitialSegmenter:
                 )
                 idx += 1
                 continue
+
 
             # Qualquer outro elemento gráfico / placeholder sem texto traduzível
             idx += 1

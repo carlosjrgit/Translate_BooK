@@ -170,3 +170,22 @@ def test_madlad_engine_n_best_and_ranker() -> None:
     assert draft.selected_text == draft.candidates[0].text
     assert "score_breakdown" in draft.candidates[0].metadata
     assert draft.metadata["parameters"]["n_best"] == 3
+
+
+def test_clean_repetition_loops() -> None:
+    """Valida a erradicação de loops repetitivos e vazamentos de metadados."""
+    from book_translator.translation.madlad import clean_repetition_loops
+
+    corrupted = (
+        "Esta é a frase traduzida.\n"
+        "model_input=Crônicas de um viajante - Wikisource\n"
+        "Viagem ao mar - Wikisource\n"
+        "Viagem ao mar - Wikisource\n"
+        "O marinheiro olhou para o horizonte. O marinheiro olhou para o horizonte. O marinheiro olhou para o horizonte."
+    )
+    cleaned = clean_repetition_loops(corrupted)
+    assert "model_input" not in cleaned
+    assert "Wikisource" not in cleaned
+    assert cleaned.count("O marinheiro olhou para o horizonte.") == 1
+    assert "Esta é a frase traduzida." in cleaned
+

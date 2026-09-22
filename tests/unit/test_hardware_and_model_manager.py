@@ -97,16 +97,10 @@ def test_model_manager_status_and_corruption_detection(tmp_path: Path):
     assert manager.verify_model_integrity(model_id) is False
 
     # 3. Simular arquivos íntegros com hash correto
-    # Criamos um modelo fake no registro para testar integridade real
-    test_content_1 = b"fake weights for testing model binary"
-    test_content_2 = b'{"vocab": "test"}'
-    hash_1 = hashlib.sha256(test_content_1).hexdigest()
-    hash_2 = hashlib.sha256(test_content_2).hexdigest()
-
-    entry.files[0].sha256 = hash_1
-    entry.files[1].sha256 = hash_2
-    (m_dir / entry.files[0].filename).write_bytes(test_content_1)
-    (m_dir / entry.files[1].filename).write_bytes(test_content_2)
+    for f in entry.files:
+        test_content = f"fake content for {f.filename}".encode("utf-8")
+        f.sha256 = hashlib.sha256(test_content).hexdigest()
+        (m_dir / f.filename).write_bytes(test_content)
 
     assert manager.get_model_status(model_id) == ModelStatus.INSTALLED
     assert manager.verify_model_integrity(model_id) is True

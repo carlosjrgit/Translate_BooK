@@ -90,3 +90,10 @@ packaging/build/
 scratch/
 tmp/
 temp/
+
+# Environment & Secret files
+.env
+.env.*
+*.key
+*.pem
+secrets/

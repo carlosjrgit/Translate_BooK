@@ -69,13 +69,17 @@ class AboutWidget(QWidget):
         card_layout.setSpacing(6)
         card_layout.setAlignment(Qt.AlignCenter)
 
-        # 1. Logo Oficial CJRDOOM
+        # 1. Logo Oficial CJRDOOM com Contraste Garantido
         logo_label = QLabel(card)
         logo_label.setAlignment(Qt.AlignCenter)
 
-        # Localização da logo tratada com transparência e contraste garantido
         assets_dir = Path(__file__).resolve().parent.parent / "assets"
-        logo_path = assets_dir / "logo_transparent_light.png"
+        # Prioriza o logo oficial enviado pelo desenvolvedor
+        logo_path = assets_dir / "cjr_doom_logo.jpg"
+        if not logo_path.exists():
+            logo_path = assets_dir / "cjr_doom_logo.png"
+        if not logo_path.exists():
+            logo_path = assets_dir / "logo_transparent_light.png"
         if not logo_path.exists():
             logo_path = assets_dir / "logo.png"
 
@@ -83,20 +87,20 @@ class AboutWidget(QWidget):
             pixmap = QPixmap(str(logo_path))
             if not pixmap.isNull():
                 scaled_pixmap = pixmap.scaled(
-                    95, 95, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                    120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation
                 )
                 logo_label.setPixmap(scaled_pixmap)
 
-        # Moldura de contraste para garantir visibilidade absoluta em qualquer tela
+        # Moldura com fundo branco/claro para garantir que a arte e a tipografia da logo apareçam perfeitamente
         logo_frame = QFrame(card)
         logo_frame.setStyleSheet(f"""
-            background-color: #242323;
-            border: 1px solid {COLOR_BORDER_SUBTLE};
-            border-radius: 4px;
-            padding: 4px;
+            background-color: #FFFFFF;
+            border: 2px solid {COLOR_BORDER_STRONG};
+            border-radius: 6px;
+            padding: 8px;
         """)
         logo_frame_layout = QVBoxLayout(logo_frame)
-        logo_frame_layout.setContentsMargins(4, 4, 4, 4)
+        logo_frame_layout.setContentsMargins(6, 6, 6, 6)
         logo_frame_layout.addWidget(logo_label)
         card_layout.addWidget(logo_frame)
 
@@ -112,7 +116,7 @@ class AboutWidget(QWidget):
         card_layout.addWidget(lbl_app_name)
 
         # 3. Versão Oficial
-        lbl_version = QLabel("Version 1.0.0", card)
+        lbl_version = QLabel("Version 1.0.1", card)
         lbl_version.setAlignment(Qt.AlignCenter)
         lbl_version.setStyleSheet(f"""
             font-size: 13px;

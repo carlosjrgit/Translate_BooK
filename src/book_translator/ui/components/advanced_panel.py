@@ -22,6 +22,7 @@ class AdvancedSettingsPanel(QWidget):
     """Configurações avançadas para usuários técnicos e editores seniores."""
 
     sig_settings_changed = Signal(dict)
+    sig_open_model_manager = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -36,7 +37,7 @@ class AdvancedSettingsPanel(QWidget):
         form.setContentsMargins(12, 12, 12, 12)
         form.setSpacing(10)
 
-        # 1. Diretório de Modelos
+        # 1. Diretório de Modelos e Gerenciador
         dir_row = QHBoxLayout()
         self.txt_model_dir = QLineEdit(".models", self)
         self.txt_model_dir.setReadOnly(True)
@@ -45,6 +46,12 @@ class AdvancedSettingsPanel(QWidget):
         btn_browse_model = QPushButton("Alterar Pasta...", self)
         btn_browse_model.clicked.connect(self._select_models_dir)
         dir_row.addWidget(btn_browse_model)
+
+        btn_manage_models = QPushButton("Gerenciar / Baixar Modelos...", self)
+        btn_manage_models.setStyleSheet("font-weight: 600;")
+        btn_manage_models.clicked.connect(self.sig_open_model_manager.emit)
+        dir_row.addWidget(btn_manage_models)
+
         form.addRow("Diretório de Pesos:", dir_row)
 
         # 2. Orçamento de Contexto (Context Budget Tokens)

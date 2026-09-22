@@ -181,3 +181,34 @@ def test_segmenter_idempotence_and_determinism() -> None:
         assert s1.original_hash == s2.original_hash
         assert s1.sequence_order == s2.sequence_order
         assert s1.metadata == s2.metadata
+
+
+def test_segmenter_long_paragraph_sentence_splitting() -> None:
+    # Configura segmentador para dividir parágrafos com mais de 30 palavras
+    cfg = PreprocessingConfig(split_long_paragraphs=True, max_segment_words=30)
+    segmenter = InitialSegmenter(cfg)
+
+    ch = Chapter(id="ch_0005", title="Chapter 5", order=5)
+    long_text = (
+        "Call me Ishmael. Some years ago, never mind how long precisely, having little or no money "
+        "in my purse, and nothing particular to interest me on shore, I thought I would sail about "
+        "a little and see the watery part of the world. It is a way I have of driving off the spleen "
+        "and regulating the circulation. This is my substitute for pistol and ball."
+    )
+    ch.paragraphs.append(
+        Paragraph(id="p_long", chapter_id="ch_0005", raw_text=long_text, reading_order=1)
+    )
+
+    segments = segmenter.segment_chapter(ch)
+    # Deve ser subdividido em múltiplos segmentos
+    assert len(segments) > 1
+
+    # Valida integridade absoluta sem perda de nenhuma palavra
+    valid, msg = InitialSegmenter.verify_no_content_loss(ch, segments)
+    assert valid is True, msg
+
+    # Todos os segmentos devem apontar para o parágrafo original
+    for s in segments:
+        assert s.paragraph_id == "p_long"
+        assert s.metadata.get("paragraph_split") is True
+

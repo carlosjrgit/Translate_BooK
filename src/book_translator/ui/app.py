@@ -22,7 +22,18 @@ def launch_gui(argv: list[str] | None = None) -> int:
     app.setApplicationName("Translate Book CJrTools")
     app.setOrganizationName("CJrTools")
 
-    window = MainWindow()
+    # Varredura preventiva: se nenhum modelo homologado estiver instalado localmente,
+    # executa o assistente inicial (ModelSetupDialog) com diagnóstico e recomendação
+    from book_translator.system.model_manager import ModelManager
+    from book_translator.ui.components.model_setup_dialog import ModelSetupDialog
+
+    model_manager = ModelManager()
+    if not model_manager.is_any_model_installed():
+        logger.info("Nenhum modelo neural instalado localmente. Exibindo assistente de download...")
+        dialog = ModelSetupDialog(model_manager=model_manager)
+        dialog.exec()
+
+    window = MainWindow(model_manager=model_manager)
     window.show()
 
     logger.info("Interface Gráfica PySide6 iniciada com sucesso.")

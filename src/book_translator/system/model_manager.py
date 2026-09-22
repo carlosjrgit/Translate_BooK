@@ -83,15 +83,39 @@ SUPPORTED_MODELS_REGISTRY: dict[str, ModelCatalogEntry] = {
         files=[
             ModelFileMetadata(
                 filename="model.bin",
-                url="https://huggingface.co/michaelfeil/ct2fast-madlad400-3b-mt/resolve/main/model.bin",
-                sha256="c0245a4a34b22f7f9b09a9dbd4e5a95913efd85c5b96a8494924296dbf5c2f82",
-                size_bytes=2_412_345_678,
+                url="https://huggingface.co/Nextcloud-AI/madlad400-3b-mt-ct2-int8/resolve/main/model.bin",
+                sha256="77b9fd9ab97c1259d07089b5f854393dad81bc5fb5647d3f9a5d101c94f40daa",
+                size_bytes=2_950_208_329,
+            ),
+            ModelFileMetadata(
+                filename="spiece.model",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-3b-mt-ct2-int8/resolve/main/spiece.model",
+                sha256="ef11ac9a22c7503492f56d48dce53be20e339b63605983e9f27d2cd0e0f3922c",
+                size_bytes=4_427_844,
             ),
             ModelFileMetadata(
                 filename="shared_vocabulary.json",
-                url="https://huggingface.co/michaelfeil/ct2fast-madlad400-3b-mt/resolve/main/shared_vocabulary.json",
-                sha256="9f83f2a8934523bc7e0d37e28373b983021f114a82a0e46a782b1d09e530999a",
-                size_bytes=4_123_456,
+                url="https://huggingface.co/Nextcloud-AI/madlad400-3b-mt-ct2-int8/raw/main/shared_vocabulary.json",
+                sha256="c327551ce3ca6efc7b437e11a267f79979893332dda8a1d146e2c950815193f8",
+                size_bytes=5_477_099,
+            ),
+            ModelFileMetadata(
+                filename="config.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-3b-mt-ct2-int8/raw/main/config.json",
+                sha256="90fb54962455a4e0a0bc7235c0f063d7e46d9c1a1ae003af8059809abd6aeece",
+                size_bytes=224,
+            ),
+            ModelFileMetadata(
+                filename="tokenizer_config.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-3b-mt-ct2-int8/raw/main/tokenizer_config.json",
+                sha256="641fc660745306dfb935f666a68f8bc10a44c39241cfb357be518fda8c09662d",
+                size_bytes=830,
+            ),
+            ModelFileMetadata(
+                filename="special_tokens_map.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-3b-mt-ct2-int8/raw/main/special_tokens_map.json",
+                sha256="7f79f1d5063d56c4b980eec0692f3c7429bdef335071d34e566bd00fd4b5e3e0",
+                size_bytes=414,
             ),
         ],
     ),
@@ -108,15 +132,39 @@ SUPPORTED_MODELS_REGISTRY: dict[str, ModelCatalogEntry] = {
         files=[
             ModelFileMetadata(
                 filename="model.bin",
-                url="https://huggingface.co/michaelfeil/ct2fast-madlad400-7b-mt/resolve/main/model.bin",
-                sha256="e123984920491024823904820394820394820394820394820394820394820394",
-                size_bytes=5_320_000_000,
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/resolve/main/model.bin",
+                sha256="028675a47ec8a287161d24c01a62796595124d48e9972eacba4b08150ef09ba5",
+                size_bytes=8_312_279_065,
+            ),
+            ModelFileMetadata(
+                filename="spiece.model",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/resolve/main/spiece.model",
+                sha256="ef11ac9a22c7503492f56d48dce53be20e339b63605983e9f27d2cd0e0f3922c",
+                size_bytes=4_427_844,
             ),
             ModelFileMetadata(
                 filename="shared_vocabulary.json",
-                url="https://huggingface.co/michaelfeil/ct2fast-madlad400-7b-mt/resolve/main/shared_vocabulary.json",
-                sha256="9f83f2a8934523bc7e0d37e28373b983021f114a82a0e46a782b1d09e530999a",
-                size_bytes=4_123_456,
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/raw/main/shared_vocabulary.json",
+                sha256="c327551ce3ca6efc7b437e11a267f79979893332dda8a1d146e2c950815193f8",
+                size_bytes=5_477_099,
+            ),
+            ModelFileMetadata(
+                filename="config.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/raw/main/config.json",
+                sha256="90fb54962455a4e0a0bc7235c0f063d7e46d9c1a1ae003af8059809abd6aeece",
+                size_bytes=224,
+            ),
+            ModelFileMetadata(
+                filename="tokenizer_config.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/raw/main/tokenizer_config.json",
+                sha256="641fc660745306dfb935f666a68f8bc10a44c39241cfb357be518fda8c09662d",
+                size_bytes=830,
+            ),
+            ModelFileMetadata(
+                filename="special_tokens_map.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/raw/main/special_tokens_map.json",
+                sha256="7f79f1d5063d56c4b980eec0692f3c7429bdef335071d34e566bd00fd4b5e3e0",
+                size_bytes=414,
             ),
         ],
     ),
@@ -133,15 +181,39 @@ SUPPORTED_MODELS_REGISTRY: dict[str, ModelCatalogEntry] = {
         files=[
             ModelFileMetadata(
                 filename="model.bin",
-                url="https://huggingface.co/michaelfeil/ct2fast-madlad400-10b-mt/resolve/main/model.bin",
-                sha256="f493028490284902849028490284902849028490284902849028490284902849",
-                size_bytes=8_150_000_000,
+                url="https://huggingface.co/Heng666/madlad400-10b-mt-ct2-int8/resolve/main/model.bin",
+                sha256="2d5df751c281f4480cd45529b88f7b7dfff7e387469d619d37b986a00150734d",
+                size_bytes=10_730_130_249,
+            ),
+            ModelFileMetadata(
+                filename="spiece.model",
+                url="https://huggingface.co/Heng666/madlad400-10b-mt-ct2-int8/resolve/main/spiece.model",
+                sha256="ef11ac9a22c7503492f56d48dce53be20e339b63605983e9f27d2cd0e0f3922c",
+                size_bytes=4_427_844,
             ),
             ModelFileMetadata(
                 filename="shared_vocabulary.json",
-                url="https://huggingface.co/michaelfeil/ct2fast-madlad400-10b-mt/resolve/main/shared_vocabulary.json",
-                sha256="9f83f2a8934523bc7e0d37e28373b983021f114a82a0e46a782b1d09e530999a",
-                size_bytes=4_123_456,
+                url="https://huggingface.co/Heng666/madlad400-10b-mt-ct2-int8/raw/main/shared_vocabulary.json",
+                sha256="c327551ce3ca6efc7b437e11a267f79979893332dda8a1d146e2c950815193f8",
+                size_bytes=5_477_099,
+            ),
+            ModelFileMetadata(
+                filename="config.json",
+                url="https://huggingface.co/Heng666/madlad400-10b-mt-ct2-int8/raw/main/config.json",
+                sha256="90fb54962455a4e0a0bc7235c0f063d7e46d9c1a1ae003af8059809abd6aeece",
+                size_bytes=224,
+            ),
+            ModelFileMetadata(
+                filename="tokenizer_config.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/raw/main/tokenizer_config.json",
+                sha256="641fc660745306dfb935f666a68f8bc10a44c39241cfb357be518fda8c09662d",
+                size_bytes=830,
+            ),
+            ModelFileMetadata(
+                filename="special_tokens_map.json",
+                url="https://huggingface.co/Nextcloud-AI/madlad400-7b-mt-bt-ct2-int8/raw/main/special_tokens_map.json",
+                sha256="7f79f1d5063d56c4b980eec0692f3c7429bdef335071d34e566bd00fd4b5e3e0",
+                size_bytes=414,
             ),
         ],
     ),
@@ -200,13 +272,16 @@ class ModelManager:
         if part_files:
             return ModelStatus.DOWNLOADING
 
-        # Checa presença de todos os arquivos obrigatórios
-        for f_meta in entry.files:
-            file_path = m_dir / f_meta.filename
-            if not file_path.exists():
-                return ModelStatus.NOT_INSTALLED
+        # Checa presença de arquivos do modelo
+        existing_files = [f for f in entry.files if (m_dir / f.filename).exists()]
+        if not existing_files:
+            return ModelStatus.NOT_INSTALLED
 
-        # Verifica integridade básica
+        # Se há arquivos presentes mas faltam componentes obrigatórios, o modelo está incompleto/corrompido
+        if len(existing_files) < len(entry.files):
+            return ModelStatus.CORRUPTED
+
+        # Verifica integridade de checksums dos arquivos
         if self.verify_model_integrity(model_id):
             return ModelStatus.INSTALLED
         else:
@@ -223,6 +298,21 @@ class ModelManager:
             if self.get_model_status(model_id) == ModelStatus.INSTALLED:
                 installed.append(model_id)
         return installed
+
+    def is_any_model_installed(self) -> bool:
+        """Verifica se há ao menos uma versão do modelo instalada e íntegra localmente."""
+        return len(self.list_installed_models()) > 0
+
+    def get_recommended_model_id(self) -> str:
+        """Avalia o hardware e retorna o model_id ideal (economy=3B, balanced=7B, quality=10B)."""
+        profile = self.profiler.profile()
+        target = profile.recommended_profile
+        if target == "quality":
+            return "madlad400-10b-mt-ct2-int8"
+        elif target == "economy":
+            return "madlad400-3b-mt-ct2-int8"
+        return "madlad400-7b-mt-ct2-int8"
+
 
     def verify_model_integrity(self, model_id: str) -> bool:
         """Verifica os checksums SHA-256 dos arquivos baixados contra o catálogo auditável."""
@@ -326,7 +416,9 @@ class ModelManager:
                 continue
 
             existing_bytes = part_path.stat().st_size if part_path.exists() else 0
-            headers = {}
+            headers = {
+                "User-Agent": "TranslateBookCJrTools/1.0 (Windows; Python; LocalML)"
+            }
             if existing_bytes > 0:
                 headers["Range"] = f"bytes={existing_bytes}-"
                 logger.info(f"Retomando download de '{f_meta.filename}' a partir do byte {existing_bytes}...")

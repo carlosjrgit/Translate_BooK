@@ -14,7 +14,9 @@ from book_translator.core.models import Document, Segment, SegmentStatus
 from book_translator.database.sqlite import SQLiteDatabase
 from book_translator.export.manager import ExportManager
 from book_translator.logging import get_logger
+from book_translator.memory.style_bible import StyleBible
 from book_translator.qa.deterministic import DeterministicQAEngine
+
 from book_translator.translation.pipeline import (
     CancellationToken,
     TranslationPipeline,
@@ -118,12 +120,31 @@ class PipelineWorker(QThread):
         analyzer = BookAnalyzer()
         report = analyzer.analyze(document)
 
+        db = self.task_kwargs.get("db")
+        project_id = self.task_kwargs.get("project_id")
+        if db and project_id:
+            try:
+                sb = db.get_style_bible(project_id) or StyleBible()
+                if hasattr(report, "formality_level") and report.formality_level:
+                    sb.set_rule("formality_level", report.formality_level, confidence=0.85, is_inferred=True)
+                if hasattr(report, "predominant_narrator") and report.predominant_narrator:
+                    sb.set_rule("narrator", report.predominant_narrator, confidence=0.85, is_inferred=True)
+                if hasattr(report, "estimated_tone") and report.estimated_tone:
+                    sb.set_rule("tone", report.estimated_tone, confidence=0.80, is_inferred=True)
+                # Define padrão editorial de diálogo com travessão
+                sb.set_rule("editorial_punctuation", "dialogue_dash", confidence=0.95, is_inferred=True)
+                db.save_style_bible(project_id, sb)
+                self.signals.sig_log.emit("Manual de Estilo (Style Bible) inicializado com diretrizes da análise.", "info")
+            except Exception as exc:
+                logger.warning(f"Falha ao persistir style_bible da análise: {exc}")
+
         self.signals.sig_analysis_finished.emit(report)
         self.signals.sig_log.emit(
             f"Análise concluída: {len(report.entities)} entidades, "
             f"{len(report.recurrent_concepts)} conceitos-chave identificados.",
             "info",
         )
+
 
     def _run_translate(self) -> None:
         self.signals.sig_phase_changed.emit("Traduzindo obra")
@@ -163,13 +184,24 @@ class PipelineWorker(QThread):
 
             if not seg.is_translated:
                 try:
-                    # Executa tradução do segmento
-                    target_text = pipeline.translation_engine.translate_segment(
-                        seg.original_text,
-                        source_language="en",
-                        target_language="pt-BR",
+                    # Recupera contexto semântico (glossário e memórias) e regras de estilo
+                    context = (
+                        pipeline.context_engine.retrieve_context(seg)
+                        if getattr(pipeline, "context_engine", None)
+                        else None
                     )
-                    seg.translated_text = target_text
+                    style_bible = (
+                        db.get_style_bible(project_id)
+                        if hasattr(db, "get_style_bible")
+                        else None
+                    )
+
+                    draft = pipeline.translation_engine.translate_segment(
+                        segment=seg,
+                        context=context,
+                        style_bible=style_bible,
+                    )
+                    seg.translated_text = draft.selected_text
                     seg.status = SegmentStatus.TRANSLATED
                     db.save_segment(seg)
                     completed_count += 1
@@ -177,6 +209,8 @@ class PipelineWorker(QThread):
                     errors_count += 1
                     self.signals.sig_log.emit(f"Erro no segmento {seg.id}: {exc}", "error")
                     self.signals.sig_counters.emit(errors_count, warnings_count)
+
+
 
             seg_duration = time.perf_counter() - seg_t0
             recent_durations.append(seg_duration)
@@ -229,15 +263,30 @@ class PipelineWorker(QThread):
         errors_count = 0
         warnings_count = 0
 
+        total_segments = sum(len(db.get_segments_by_chapter(ch.id)) for ch in doc.chapters)
+        processed_count = 0
+
         for ch in doc.chapters:
+            chapter_title = ch.title or (f"Capítulo {ch.order}" if hasattr(ch, "order") else ch.id)
             segs = db.get_segments_by_chapter(ch.id)
             for seg in segs:
                 if not self._wait_if_paused_or_cancelled():
+                    self.signals.sig_log.emit("Revisão QA cancelada cooperativamente.", "warning")
                     return
-                if seg.translated_text:
-                    report = validator.validate(seg)
-                    if not report.passed:
 
+                processed_count += 1
+                percent = (processed_count / total_segments) * 100.0 if total_segments > 0 else 0.0
+                chapter_info = chapter_title
+                segment_info = f"Segmento {processed_count} de {total_segments}"
+                self.signals.sig_progress.emit(processed_count, total_segments, percent, chapter_info, segment_info)
+
+                if seg.translated_text:
+                    report = validator.evaluate(
+                        segment=seg,
+                        original_text=seg.original_text,
+                        translated_text=seg.translated_text,
+                    )
+                    if not report.passed:
                         for issue in report.issues:
                             if issue.severity.value == "review_required":
                                 errors_count += 1

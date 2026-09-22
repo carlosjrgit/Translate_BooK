@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 
 from book_translator.core.models import Document
-from book_translator.export.base import ExporterInterface, ExportOptions
+from book_translator.export.base import ExporterInterface, ExportOptions, stitch_chapter_segments
 from book_translator.export.naming import generate_safe_output_path, validate_safe_output_path
 from book_translator.logging import get_logger
 
@@ -138,12 +138,8 @@ class EpubExporter(ExporterInterface):
                 notes: list[tuple[str, str]] = []
 
                 if ch.segments:
-                    for seg in sorted(ch.segments, key=lambda s: getattr(s, "sequence_order", 0)):
-                        txt = seg.translated_text if seg.translated_text else seg.original_text
-                        if not txt or not txt.strip():
-                            continue
-                        unit_type = seg.metadata.get("unit_type", "paragraph")
-                        paras.append((unit_type, txt.strip()))
+                    for unit_type, txt in stitch_chapter_segments(ch.segments):
+                        paras.append((unit_type, txt))
                 elif ch.paragraphs:
                     for p in sorted(ch.paragraphs, key=lambda x: getattr(x, "reading_order", 0)):
                         txt = getattr(p, "normalized_text", p.raw_text)

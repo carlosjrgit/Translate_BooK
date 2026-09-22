@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QStackedWidget,
     QTabWidget,
     QTextEdit,
@@ -19,13 +21,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+
 from book_translator.core.models import Document
 from book_translator.database.sqlite import SQLiteDatabase
 from book_translator.logging import get_logger
 from book_translator.ocr.engine import MockOcrEngine, OcrService, TesseractOcrEngine
 from book_translator.parsers.factory import create_parser
+from book_translator.preprocessing.pipeline import PreprocessingPipeline
 from book_translator.projects.manager import Project, ProjectManager
 from book_translator.system.hardware import HardwareProfile, HardwareProfiler
+from book_translator.system.model_manager import ModelManager
 from book_translator.translation import (
     MadladTranslationEngine,
     MockMadladBackend,
@@ -36,7 +41,10 @@ from book_translator.ui.components.about_widget import AboutWidget
 from book_translator.ui.components.advanced_panel import AdvancedSettingsPanel
 from book_translator.ui.components.analysis_summary_widget import AnalysisSummaryWidget
 from book_translator.ui.components.metrics_bar import MetricsBar
+from book_translator.ui.components.model_setup_dialog import ModelSetupDialog
+from book_translator.ui.components.promote_entities_dialog import PromoteEntitiesDialog
 from book_translator.ui.components.qa_alerts_widget import QAAlertsWidget
+from book_translator.ui.components.segment_edit_dialog import SegmentEditDialog
 from book_translator.ui.theme import (
     APP_STYLESHEET,
     COLOR_ACCENT,
@@ -57,15 +65,20 @@ logger = get_logger("ui.main_window")
 class MainWindow(QMainWindow):
     """Interface Gráfica do Translate Book CJrTools cobrindo as 11 etapas do fluxo editorial."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        model_manager: ModelManager | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Translate Book CJrTools — Tradução Editorial Profissional (EN -> PT-BR)")
         self.resize(1150, 800)
-        self.setMinimumSize(850, 600)
+        self.setMinimumSize(780, 520)
         self.setStyleSheet(APP_STYLESHEET)
 
         # Estado do Projeto e Pipeline
         self.project_manager = ProjectManager(base_projects_dir=Path(".projects"))
+        self.model_manager = model_manager or ModelManager()
         self.hardware_profiler = HardwareProfiler()
         self.current_project: Project | None = None
         self.current_db: SQLiteDatabase | None = None
@@ -153,6 +166,10 @@ class MainWindow(QMainWindow):
         self.btn_export.clicked.connect(self._on_export)
         actions_layout.addWidget(self.btn_export)
 
+        for btn in (self.btn_select_file, self.btn_analyze, self.btn_translate, self.btn_qa, self.btn_export):
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            btn.setMinimumHeight(34)
+
         tab_main_layout.addWidget(actions_card)
 
         # Stack de Telas de Conteúdo (Resumo Analítico, Alertas QA, Log)
@@ -160,10 +177,12 @@ class MainWindow(QMainWindow):
 
         # View 1: Resumo Analítico da Obra
         self.view_analysis = AnalysisSummaryWidget(self)
+        self.view_analysis.sig_promote_entities.connect(self._on_promote_entities_requested)
         self.stacked_views.addWidget(self.view_analysis)
 
         # View 2: Tabela de Alertas de QA
         self.view_qa = QAAlertsWidget(self)
+        self.view_qa.sig_edit_segment.connect(self._on_edit_segment_requested)
         self.stacked_views.addWidget(self.view_qa)
 
         tab_main_layout.addWidget(self.stacked_views)
@@ -171,6 +190,7 @@ class MainWindow(QMainWindow):
 
         # Aba 2: Modo Avançado
         self.advanced_panel = AdvancedSettingsPanel(self)
+        self.advanced_panel.sig_open_model_manager.connect(self._open_model_setup_dialog)
         self.tabs.addTab(self.advanced_panel, "Modo Avançado")
 
         # Aba 3: Sobre (About) com Logo Oficial CJRDOOM
@@ -245,7 +265,21 @@ class MainWindow(QMainWindow):
 
             parser = create_parser(source, ocr_service=ocr_service)
             self.current_document = parser.parse(source, title=proj_title)
-            self.current_db.save_document(self.current_document)
+            self.current_db.save_document(
+                self.current_document,
+                project_id=self.current_project.metadata.project_id,
+            )
+
+            # 4. Pré-processamento e segmentação (Bug #1 fix)
+            preprocessing = PreprocessingPipeline()
+            self.current_document = preprocessing.process_document(self.current_document)
+
+            seg_count = 0
+            for chapter in self.current_document.chapters:
+                for seg in chapter.segments:
+                    self.current_db.save_segment(seg)
+                    seg_count += 1
+            self._log(f"Segmentação concluída: {seg_count} segmentos prontos para tradução.", "info")
 
             self.view_analysis.populate(self.current_document)
             self.stacked_views.setCurrentIndex(0)
@@ -265,10 +299,22 @@ class MainWindow(QMainWindow):
         if not self.current_document:
             return
 
+        task_kwargs: dict[str, Any] = {"document": self.current_document}
+        if self.current_db and self.current_project:
+            task_kwargs["db"] = self.current_db
+            task_kwargs["project_id"] = self.current_project.metadata.project_id
+
         self._start_worker(
             task_name="analyze",
-            task_kwargs={"document": self.current_document},
+            task_kwargs=task_kwargs,
         )
+
+
+    def _open_model_setup_dialog(self) -> None:
+        """Abre o diálogo de configuração e download de modelos a qualquer momento."""
+        dialog = ModelSetupDialog(model_manager=self.model_manager, parent=self)
+        dialog.exec()
+        self._update_hardware_info()
 
     def _on_start_translation(self) -> None:
         """Etapas 7-8: Escolher perfil e Traduzir com MADLAD-400."""
@@ -276,13 +322,73 @@ class MainWindow(QMainWindow):
             return
 
         _adv = self.advanced_panel.get_settings()
-        engine = MadladTranslationEngine(backend=MockMadladBackend())
+
+        # Verifica se há modelo neural instalado localmente
+        installed = self.model_manager.list_installed_models()
+        if installed:
+            active_entry = self.model_manager.get_active_model()
+            active_id = active_entry.model_id if active_entry else installed[0]
+            model_path = self.model_manager.get_model_dir(active_id)
+            try:
+                from book_translator.translation.madlad import (
+                    CTranslate2Backend,
+                    DeviceType,
+                    QuantizationType,
+                )
+
+                gpu = self.hardware_profile.gpu
+                if (
+                    gpu.available
+                    and active_entry
+                    and gpu.vram_total_gb >= active_entry.min_vram_gb
+                ):
+                    dev = DeviceType.CUDA
+                    quant = QuantizationType.Q8
+                else:
+                    dev = DeviceType.CPU
+                    quant = QuantizationType.Q8
+                    if gpu.available and active_entry:
+                        self._log(
+                            f"VRAM da GPU ({gpu.vram_total_gb:.1f} GB) insuficiente para '{active_id}' "
+                            f"(mínimo {active_entry.min_vram_gb:.1f} GB). Executando com segurança em CPU.",
+                            "info",
+                        )
+
+                backend = CTranslate2Backend(model_path=model_path, device=dev, quantization=quant)
+                engine = MadladTranslationEngine(backend=backend)
+                self._log(f"Motor neural ativo: '{active_id}' em {dev.value.upper()} ({quant.value}).", "info")
+            except Exception as exc:
+                logger.warning(
+                    f"Falha ao inicializar backend neural CTranslate2 ({exc}). Utilizando MockMadladBackend como fallback."
+                )
+                engine = MadladTranslationEngine(backend=MockMadladBackend())
+                self._log(f"Aviso de inferência: {exc}. Operando com motor simulado (Mock).", "warning")
+        else:
+            engine = MadladTranslationEngine(backend=MockMadladBackend())
+            self._log(
+                "Aviso: Nenhum modelo neural instalado localmente. Operando em modo simulado (Mock).",
+                "warning",
+            )
+
+        from book_translator.context.engine import ContextRetrievalEngine
+        from book_translator.memory.manager import MemoryManager
+
+        project_id = self.current_project.metadata.project_id
+        memory_mgr = MemoryManager(project_id=project_id, db=self.current_db)
+        context_engine = ContextRetrievalEngine(
+            memory_manager=memory_mgr,
+            strategy="balanced",
+            db=self.current_db,
+        )
+        self._log("Contexto e Memória ativos: Glossário e Style Bible conectados ao pipeline.", "info")
 
         pipeline = TranslationPipeline(
             db=self.current_db,
             translation_engine=engine,
+            context_engine=context_engine,
             config=TranslationPipelineConfig(),
         )
+
 
         self._start_worker(
             task_name="translate",
@@ -393,3 +499,53 @@ class MainWindow(QMainWindow):
     def _on_cancel_requested(self) -> None:
         if self.active_worker:
             self.active_worker.cancel()
+
+    def _on_edit_segment_requested(self, segment_id: str, alert_info: dict) -> None:
+        """Abre diálogo modal de revisão humana para edição e persistência de um segmento."""
+        if not self.current_db or not self.current_project:
+            QMessageBox.warning(self, "Aviso", "Nenhum projeto ativo para editar segmentos.")
+            return
+
+        seg = self.current_db.get_segment(segment_id)
+        if not seg:
+            QMessageBox.warning(self, "Aviso", f"Segmento '{segment_id}' não encontrado no banco de dados.")
+            return
+
+        dlg = SegmentEditDialog(segment=seg, alert_info=alert_info, parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            new_text = dlg.get_translated_text()
+            seg.translated_text = new_text
+            self.current_db.save_segment(seg)
+            self._log(f"Segmento '{segment_id}' revisado e salvo no banco com sucesso.", level="success")
+            QMessageBox.information(
+                self,
+                "Segmento Atualizado",
+                f"Segmento '{segment_id}' atualizado com sucesso no banco de dados da obra!",
+            )
+
+    def _on_promote_entities_requested(self) -> None:
+        """Abre modal para o usuário selecionar e promover entidades detectadas para o Glossário travado."""
+        if not self.current_db or not self.current_project:
+            QMessageBox.warning(self, "Aviso", "Nenhum projeto ativo para promover entidades.")
+            return
+
+        report = getattr(self.view_analysis, "last_report", None)
+        if not report or not getattr(report, "entities", None):
+            QMessageBox.information(self, "Informação", "Nenhuma entidade detectada para promoção.")
+            return
+
+        proj_id = self.current_project.metadata.project_id
+        dlg = PromoteEntitiesDialog(entities=report.entities, project_id=proj_id, parent=self)
+        if dlg.exec() == QDialog.Accepted:
+            promoted_entries = dlg.get_promoted_entries()
+            saved_count = 0
+            for entry in promoted_entries:
+                self.current_db.save_glossary_entry(proj_id, entry)
+                saved_count += 1
+            self._log(f"{saved_count} entidades promovidas e travadas no Glossário com sucesso.", level="success")
+            QMessageBox.information(
+                self,
+                "Glossário Atualizado",
+                f"{saved_count} entidades foram travadas no Glossário da obra e serão respeitadas na tradução!",
+            )
+

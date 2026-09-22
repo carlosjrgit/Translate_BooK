@@ -24,7 +24,104 @@ from book_translator.translation.base import (
 logger = get_logger("translation.madlad")
 
 
+def clean_repetition_loops(text: str) -> str:
+    """Remove loops de alucinação, repetições degeneradas e vazamentos de corpus de treino."""
+    if not text:
+        return ""
+
+    # 1. Identifica frases de vazamento originadas em model_input=
+    model_input_matches = re.findall(r"(?i)\bmodel_input\s*=\s*(.*?)(?:-|\n|$)", text)
+    leak_phrases = set()
+    for m in model_input_matches:
+        phrase = m.strip().lower()
+        if phrase:
+            leak_phrases.add(phrase)
+
+    meta_patterns = [
+        re.compile(r"(?i)\bmodel_input\b"),
+        re.compile(r"(?i)\bwikisource\b"),
+        re.compile(r"(?i)\bwikipedia\b"),
+        re.compile(r"(?i)\bwikiquote\b"),
+    ]
+
+    cleaned_lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            cleaned_lines.append("")
+            continue
+        if any(pat.search(line) for pat in meta_patterns):
+            continue
+        if line.lower() in leak_phrases:
+            continue
+        cleaned_lines.append(raw_line)
+
+    cleaned = "\n".join(cleaned_lines)
+
+    # 2. Desduplicação de linhas consecutivas; se uma linha repetir 3+ vezes, trata como loop degenerado e remove
+    raw_lines = cleaned.splitlines()
+    deduped_lines = []
+    idx = 0
+    while idx < len(raw_lines):
+        line = raw_lines[idx]
+        stripped = line.strip().lower()
+        if not stripped:
+            deduped_lines.append("")
+            idx += 1
+            continue
+
+        repeat_count = 1
+        while (idx + repeat_count < len(raw_lines)) and (raw_lines[idx + repeat_count].strip().lower() == stripped):
+            repeat_count += 1
+
+        if repeat_count >= 3:
+            idx += repeat_count
+            continue
+        else:
+            deduped_lines.append(line)
+            idx += repeat_count
+
+    cleaned = "\n".join(deduped_lines)
+
+
+    # 3. Desduplicação de orações/frases repetidas em sequência
+    def dedup_consecutive_sentences(paragraph: str) -> str:
+        tokens = re.split(r'([.!?]+(?:\s+|$))', paragraph)
+        reconstructed = []
+        prev_sent = None
+        i = 0
+        while i < len(tokens):
+            chunk = tokens[i]
+            delim = tokens[i + 1] if i + 1 < len(tokens) else ""
+            sent_norm = chunk.strip().lower()
+            if sent_norm and sent_norm == prev_sent:
+                i += 2
+                continue
+            if sent_norm:
+                prev_sent = sent_norm
+            reconstructed.append(chunk + delim)
+            i += 2
+        return "".join(reconstructed)
+
+    para_chunks = [dedup_consecutive_sentences(p) for p in cleaned.split("\n\n")]
+    cleaned = "\n\n".join(para_chunks)
+
+    # 4. Remove repetições consecutivas de n-gramas (>= 3 palavras repetidas 2+ vezes)
+    cleaned = re.sub(
+        r'\b((?:[\wÀ-ÿ]+\s+){2,}[\wÀ-ÿ]+)(?:\s+\1)+\b',
+        r'\1',
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+
+    # 5. Normaliza quebras de linha excessivas
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+
+    return cleaned
+
+
 class QuantizationType(str, Enum):
+
     """Níveis de quantização suportados para o modelo MADLAD-400-10B-MT."""
 
     Q4 = "int4"  # ~5.5 GB em disco / VRAM
@@ -295,6 +392,35 @@ class MockMadladBackend:
         return hypotheses, elapsed_ms, metadata
 
 
+class _SentencePieceTokenizerAdapter:
+    """Adaptador de tokenizer SentencePiece nativo com suporte a caminhos Windows com acentuação."""
+
+    def __init__(self, model_file: Path | str) -> None:
+        import sentencepiece as spm
+
+        model_path = Path(model_file)
+        with open(model_path, "rb") as f:
+            proto_data = f.read()
+        self._sp = spm.SentencePieceProcessor()
+        self._sp.load_from_serialized_proto(proto_data)
+
+    def encode(self, text: str) -> list[int]:
+        return self._sp.encode(text, out_type=int)
+
+    def convert_ids_to_tokens(self, ids: list[int]) -> list[str]:
+        return [self._sp.id_to_piece(i) for i in ids]
+
+    def convert_tokens_to_ids(self, tokens: list[str]) -> list[int]:
+        return [self._sp.piece_to_id(t) for t in tokens]
+
+    def decode(self, tokens_or_ids: list[Any]) -> str:
+        if not tokens_or_ids:
+            return ""
+        if isinstance(tokens_or_ids[0], str):
+            return self._sp.decode(tokens_or_ids)
+        return self._sp.decode([int(x) for x in tokens_or_ids])
+
+
 class CTranslate2Backend:
     """Backend CTranslate2 de alto desempenho para modelos seq2seq/encoder-decoder em C++."""
 
@@ -302,7 +428,7 @@ class CTranslate2Backend:
         self,
         model_path: str | Path,
         device: DeviceType = DeviceType.CPU,
-        quantization: QuantizationType = QuantizationType.Q6,
+        quantization: QuantizationType = QuantizationType.Q8,
         allow_download: bool = False,
     ) -> None:
         self.model_path = Path(model_path)
@@ -336,25 +462,85 @@ class CTranslate2Backend:
 
         try:
             import ctranslate2
-            from transformers import AutoTokenizer  # type: ignore
         except ImportError as err:
             raise TranslationEngineError(
-                f"Dependência CTranslate2 ou Transformers ausente no ambiente: {err}. "
-                f"Instale com 'pip install ctranslate2 transformers'."
+                f"Dependência CTranslate2 ausente no ambiente: {err}. "
+                f"Instale com 'pip install ctranslate2'."
             ) from err
 
         compute_type = self.quantization.value
         dev = "cuda" if self.device == DeviceType.CUDA else "cpu"
 
+        # Adapta compute_type dinamicamente caso o dispositivo não suporte o tipo solicitado
+        try:
+            supported = ctranslate2.get_supported_compute_types(dev)
+        except Exception:
+            supported = set()
+
+        if supported and compute_type not in supported:
+            logger.warning(
+                f"Tipo de computação '{compute_type}' não suportado pelo dispositivo '{dev}'. "
+                f"Tipos suportados: {supported}. Adaptando para tipo compatível."
+            )
+            if "int8" in supported:
+                compute_type = "int8"
+            elif "int8_float32" in supported:
+                compute_type = "int8_float32"
+            elif "float32" in supported:
+                compute_type = "float32"
+            else:
+                compute_type = "auto"
+
         logger.info(
             f"Carregando CTranslate2: modelo='{self.model_path}', device='{dev}', compute_type='{compute_type}'"
         )
-        self._translator = ctranslate2.Translator(
-            str(self.model_path),
-            device=dev,
-            compute_type=compute_type,
-        )
-        self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_path))
+        try:
+            self._translator = ctranslate2.Translator(
+                str(self.model_path),
+                device=dev,
+                compute_type=compute_type,
+            )
+        except Exception as load_err:
+            if dev == "cuda":
+                logger.warning(
+                    f"Falha ao carregar modelo em CUDA ({load_err}). "
+                    f"Ativando fallback de segurança automático para CPU com INT8."
+                )
+                dev = "cpu"
+                self.device = DeviceType.CPU
+                cpu_supported = ctranslate2.get_supported_compute_types("cpu")
+                compute_type = "int8" if "int8" in cpu_supported else "auto"
+                self._translator = ctranslate2.Translator(
+                    str(self.model_path),
+                    device="cpu",
+                    compute_type=compute_type,
+                )
+            else:
+                raise
+
+        # Carregamento do tokenizer com suporte a caminhos Windows com acentuação
+        sp_model_file = self.model_path / "spiece.model"
+        tokenizer_loaded = False
+
+        if sp_model_file.exists():
+            try:
+                self._tokenizer = _SentencePieceTokenizerAdapter(sp_model_file)
+                tokenizer_loaded = True
+            except Exception as sp_err:
+                logger.warning(
+                    f"Não foi possível carregar via SentencePieceAdapter ({sp_err}). Tentando AutoTokenizer..."
+                )
+
+        if not tokenizer_loaded:
+            try:
+                from transformers import AutoTokenizer  # type: ignore
+
+                self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_path), use_fast=False)
+            except Exception as tok_err:
+                raise TranslationEngineError(
+                    f"Falha ao inicializar o tokenizer para o modelo em '{self.model_path}': {tok_err}"
+                ) from tok_err
+
         self._ready = True
 
     def translate(
@@ -374,23 +560,32 @@ class CTranslate2Backend:
         input_text = f"{lang_prefix} {prompt}" if not prompt.startswith("<2") else prompt
 
         tokens = self._tokenizer.convert_ids_to_tokens(self._tokenizer.encode(input_text))
+        if "</s>" not in tokens:
+            tokens.append("</s>")
+
         beam_size = max(n_best, 4)
+        decoding_len = max(max_tokens, len(tokens) * 3)
         results = self._translator.translate_batch(
             [tokens],
-            max_decoding_length=max_tokens,
+            max_decoding_length=decoding_len,
             sampling_temperature=temperature,
             num_hypotheses=n_best,
             beam_size=beam_size,
+            repetition_penalty=1.2,
+            no_repeat_ngram_size=3,
         )
 
         hypotheses = []
         total_tokens = 0
         for hyp_tokens in results[0].hypotheses:
+            clean_hyp = [t for t in hyp_tokens if t != "</s>"]
             decoded = self._tokenizer.decode(
-                self._tokenizer.convert_tokens_to_ids(hyp_tokens)
+                self._tokenizer.convert_tokens_to_ids(clean_hyp)
             ).strip()
+            decoded = clean_repetition_loops(decoded)
             hypotheses.append(decoded)
             total_tokens += len(hyp_tokens)
+
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
         meta = {
@@ -467,10 +662,16 @@ class TransformersBackend:
             do_sample=temperature > 0,
             num_return_sequences=n_best,
             num_beams=beam_size,
+            repetition_penalty=1.2,
+            no_repeat_ngram_size=3,
         )
         hypotheses = [
-            self._tokenizer.decode(out, skip_special_tokens=True).strip() for out in outputs
+            clean_repetition_loops(
+                self._tokenizer.decode(out, skip_special_tokens=True).strip()
+            )
+            for out in outputs
         ]
+
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
         meta = {
@@ -613,19 +814,42 @@ class MadladTranslationEngine(TranslationEngine):
 
         hypotheses: list[str] = raw_output if isinstance(raw_output, list) else [raw_output]
 
-        # 3. Pós-processamento e preservação de termos de glossário travados para cada hipótese
+        # 3. Pós-processamento, preservação de glossário e diretrizes de estilo
         candidates: list[TranslationCandidate] = []
         for idx, hyp_text in enumerate(hypotheses, start=1):
-            final_text = hyp_text
+            final_text = clean_repetition_loops(hyp_text)
             glossary_enforcements: list[str] = []
 
+            # Aplicação prioritária de termos de glossário
             if context and context.relevant_glossary:
                 for g in context.relevant_glossary:
-                    if g.locked and g.source_term and g.target_term:
-                        pattern = re.compile(rf"\b{re.escape(g.source_term)}\b", re.IGNORECASE)
-                        if pattern.search(final_text):
-                            final_text = pattern.sub(g.target_term, final_text)
-                            glossary_enforcements.append(g.source_term)
+                    if g.source_term and g.target_term:
+                        src_pattern = re.compile(rf"\b{re.escape(g.source_term)}\b", re.IGNORECASE)
+                        # Se o termo original em inglês estava no texto do segmento
+                        if src_pattern.search(input_text):
+                            # Se o modelo manteve o termo em inglês ou calque na tradução
+                            if src_pattern.search(final_text):
+                                final_text = src_pattern.sub(g.target_term, final_text)
+                                glossary_enforcements.append(g.source_term)
+                            # Se houver aliases cadastrados para o termo
+                            for alias in getattr(g, "aliases", []) or []:
+                                a_pat = re.compile(rf"\b{re.escape(alias)}\b", re.IGNORECASE)
+                                if a_pat.search(final_text):
+                                    final_text = a_pat.sub(g.target_term, final_text)
+                                    glossary_enforcements.append(alias)
+
+            # Aplicação de estilo editorial da obra
+            if style_bible:
+                is_dialogue = (
+                    segment.metadata.get("segment_type") == "dialogue"
+                    or getattr(style_bible, "editorial_punctuation", "") in ("dialogue_dash", "travessao")
+                    or getattr(style_bible, "dialogue_style", "") in ("dash", "travessao")
+                )
+                if is_dialogue and final_text:
+                    if final_text.startswith('"') and final_text.endswith('"') and len(final_text) > 2:
+                        final_text = f"— {final_text[1:-1].strip()}"
+                    elif final_text.startswith('"') and not final_text.startswith("—"):
+                        final_text = re.sub(r'^"\s*', "— ", final_text)
 
             candidate = TranslationCandidate(
                 text=final_text,
@@ -640,6 +864,7 @@ class MadladTranslationEngine(TranslationEngine):
                 },
             )
             candidates.append(candidate)
+
 
         # 4. Ranqueamento com CandidateRanker se n_best > 1
         if ranker and len(candidates) > 1:

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from book_translator.core.models import Document
 from book_translator.errors import ExportError
-from book_translator.export.base import ExporterInterface, ExportOptions
+from book_translator.export.base import ExporterInterface, ExportOptions, stitch_chapter_segments
 from book_translator.export.naming import generate_safe_output_path
 from book_translator.logging import get_logger
 
@@ -191,10 +191,8 @@ class DocxExporter(ExporterInterface):
 
             # Segmentos ou parágrafos
             if chapter.segments:
-                for seg in sorted(chapter.segments, key=lambda s: s.sequence_order):
-                    txt = seg.translated_text if seg.translated_text else seg.original_text
-                    if txt.strip():
-                        body_parts.append(self._format_paragraph_xml(txt.strip()))
+                for _unit_type, txt in stitch_chapter_segments(chapter.segments):
+                    body_parts.append(self._format_paragraph_xml(txt))
             elif chapter.paragraphs:
                 for p in sorted(chapter.paragraphs, key=lambda x: getattr(x, "reading_order", 0)):
                     txt = getattr(p, "normalized_text", p.raw_text)

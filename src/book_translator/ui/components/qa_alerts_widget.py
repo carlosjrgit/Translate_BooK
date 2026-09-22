@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
 
 class QAAlertsWidget(QWidget):
     """Tabela interativa para visualização e filtragem de alertas e anomalias de QA."""
+
+    sig_edit_segment = Signal(str, dict)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -72,11 +74,25 @@ class QAAlertsWidget(QWidget):
         self.tbl_alerts.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.tbl_alerts.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tbl_alerts.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.tbl_alerts.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.tbl_alerts.setAlternatingRowColors(True)
+        self.tbl_alerts.itemDoubleClicked.connect(self._on_item_double_clicked)
 
         group_layout.addWidget(self.tbl_alerts)
+
+        lbl_hint = QLabel("💡 Dica: Dê um duplo clique em qualquer linha para abrir a Revisão Humana e editar o segmento.", self)
+        lbl_hint.setStyleSheet("color: #a6adc8; font-style: italic; font-size: 11px;")
+        group_layout.addWidget(lbl_hint)
+
         layout.addWidget(group)
+
+    def _on_item_double_clicked(self, item: QTableWidgetItem) -> None:
+        row = item.row()
+        seg_item = self.tbl_alerts.item(row, 1)
+        if not seg_item:
+            return
+        segment_id = seg_item.text().strip()
+        matching_alert = next((a for a in self._all_alerts if a.get("segment_id") == segment_id), {})
+        self.sig_edit_segment.emit(segment_id, matching_alert)
 
     def set_alerts(self, alerts: list[dict[str, Any]]) -> None:
         self._all_alerts = list(alerts)

@@ -581,3 +581,26 @@ def test_story_memory_and_style_bible_full_persistence(db: SQLiteDatabase, tmp_p
     assert len(xrefs) == 1
     assert xrefs[0].ref_type == "foreshadowing"
     assert "toalha" in xrefs[0].evidence
+
+
+def test_sqlite_multithread_access(db, tmp_path):
+    """Garante que instâncias do SQLiteDatabase podem ser usadas através de múltiplas threads sem ProgrammingError."""
+    import threading
+
+    results = {}
+
+    def worker_thread():
+        try:
+            doc = db.load_document("roundtrip_prj")
+            results["success"] = True
+            results["doc_id"] = doc.id if doc else None
+        except Exception as exc:
+            results["error"] = exc
+
+    th = threading.Thread(target=worker_thread)
+    th.start()
+    th.join()
+
+    assert "error" not in results, f"Erro inesperado de concorrência/thread: {results.get('error')}"
+    assert results.get("success") is True
+

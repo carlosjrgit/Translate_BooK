@@ -18,7 +18,7 @@
 ; =====================================================================
 
 #define MyAppName "Translate Book CJrTools"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "CJRDOOM"
 #define MyAppExeName "Translate_Book_CJrTools.exe"
 

@@ -214,3 +214,99 @@ def test_export_manager_all_formats(sample_document: Document, tmp_path: Path):
     original_path = Path(sample_document.metadata.source_file_path)
     assert original_path.exists()
     assert original_path.read_text(encoding="utf-8") == "dummy original content"
+
+
+def test_export_stitching_split_paragraphs(tmp_path: Path):
+    """Garante que segmentos fracionados do mesmo parágrafo sejam remontados (stitched) na exportação."""
+    from book_translator.core.models import Chapter, Document, DocumentMetadata, Segment, SegmentStatus
+    import zipfile
+
+    original_file = tmp_path / "original_stitch.txt"
+    original_file.write_text("dummy original content", encoding="utf-8")
+
+    doc = Document(
+        id="doc_stitch_test",
+        title="Obra com Parágrafos Fracionados",
+        author="Autor Clássico",
+        metadata=DocumentMetadata(
+            title="Obra com Parágrafos Fracionados",
+            author="Autor Clássico",
+            language="en",
+            source_file_path=str(original_file),
+        ),
+    )
+
+    ch = Chapter(id="ch_01", title="Capítulo Fracionado", order=1, reading_order=1)
+
+    # 3 partes do mesmo parágrafo fracionado
+    seg1 = Segment(
+        id="ch_01_seg_01",
+        chapter_id="ch_01",
+        original_text="First part of sentence.",
+        translated_text="Primeira parte da sentença.",
+        status=SegmentStatus.TRANSLATED,
+        sequence_order=1,
+        paragraph_id="ch_01_p_01",
+        metadata={"paragraph_split": True, "part_index": 1},
+    )
+    seg2 = Segment(
+        id="ch_01_seg_02",
+        chapter_id="ch_01",
+        original_text="Second part of sentence.",
+        translated_text="Segunda parte da sentença.",
+        status=SegmentStatus.TRANSLATED,
+        sequence_order=2,
+        paragraph_id="ch_01_p_01",
+        metadata={"paragraph_split": True, "part_index": 2},
+    )
+    seg3 = Segment(
+        id="ch_01_seg_03",
+        chapter_id="ch_01",
+        original_text="Third part concluding.",
+        translated_text="Terceira parte concluindo.",
+        status=SegmentStatus.TRANSLATED,
+        sequence_order=3,
+        paragraph_id="ch_01_p_01",
+        metadata={"paragraph_split": True, "part_index": 3},
+    )
+
+    # Outro parágrafo independente
+    seg4 = Segment(
+        id="ch_01_seg_04",
+        chapter_id="ch_01",
+        original_text="Independent second paragraph.",
+        translated_text="Segundo parágrafo totalmente independente.",
+        status=SegmentStatus.TRANSLATED,
+        sequence_order=4,
+        paragraph_id="ch_01_p_02",
+        metadata={"paragraph_split": False},
+    )
+
+    ch.segments = [seg1, seg2, seg3, seg4]
+    doc.chapters = [ch]
+
+    manager = ExportManager()
+    out_dir = tmp_path / "stitch_out"
+    results = manager.export_all(doc, out_dir, formats=["txt", "docx", "epub"])
+
+    expected_stitched = (
+        "Primeira parte da sentença. Segunda parte da sentença. Terceira parte concluindo."
+    )
+
+    # 1. Validação TXT
+    txt_content = results["txt"].read_text(encoding="utf-8")
+    assert expected_stitched in txt_content
+    # Verifica que não há quebras de linha entre as partes do mesmo parágrafo
+    assert "Primeira parte da sentença.\n\nSegunda parte da sentença." not in txt_content
+
+    # 2. Validação DOCX
+    with zipfile.ZipFile(results["docx"], "r") as zf:
+        doc_xml = zf.read("word/document.xml").decode("utf-8")
+        assert expected_stitched in doc_xml
+
+    # 3. Validação EPUB
+    with zipfile.ZipFile(results["epub"], "r") as zf:
+        epub_xhtml = zf.read("OEBPS/chapter_001.xhtml").decode("utf-8")
+        assert f"<p>{expected_stitched}</p>" in epub_xhtml
+        assert "<p>Segundo parágrafo totalmente independente.</p>" in epub_xhtml
+

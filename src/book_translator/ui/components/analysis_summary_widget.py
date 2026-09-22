@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -16,13 +18,17 @@ from PySide6.QtWidgets import (
 
 from book_translator.analysis.base import AnalysisReport
 from book_translator.core.models import Document
+from book_translator.ui.theme import COLOR_ACCENT, RADIUS_DEFAULT
 
 
 class AnalysisSummaryWidget(QWidget):
     """Exibe o diagnóstico e o resumo analítico da obra antes da tradução."""
 
+    sig_promote_entities = Signal()
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.last_report: AnalysisReport | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -71,10 +77,23 @@ class AnalysisSummaryWidget(QWidget):
         self.tbl_entities.setAlternatingRowColors(True)
         entities_layout.addWidget(self.tbl_entities)
 
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self.btn_promote = QPushButton("Promover Entidades para o Glossário Travado", self)
+        self.btn_promote.setStyleSheet(
+            f"background-color: {COLOR_ACCENT}; color: #ffffff; font-weight: bold; "
+            f"padding: 6px 16px; border-radius: {RADIUS_DEFAULT}px;"
+        )
+        self.btn_promote.setEnabled(False)
+        self.btn_promote.clicked.connect(self.sig_promote_entities.emit)
+        btn_row.addWidget(self.btn_promote)
+        entities_layout.addLayout(btn_row)
+
         layout.addWidget(entities_group)
 
     def populate(self, document: Document, report: AnalysisReport | None = None) -> None:
         """Preenche o componente com os dados da obra e do relatório analítico."""
+        self.last_report = report
         self.lbl_title.setText(f"Título: {document.title or 'Sem Título'}")
         self.lbl_author.setText(f"Autor: {document.author or 'Desconhecido'}")
         self.lbl_chapters.setText(f"Capítulos: {len(document.chapters)}")
@@ -104,5 +123,9 @@ class AnalysisSummaryWidget(QWidget):
                 self.tbl_entities.setItem(row, 1, item_type)
                 self.tbl_entities.setItem(row, 2, item_gender)
                 self.tbl_entities.setItem(row, 3, item_count)
+
+            self.btn_promote.setEnabled(bool(report.entities))
         else:
             self.lbl_tone.setText("Tom: Neutro | Formalidade: Padrão")
+            self.btn_promote.setEnabled(False)
+

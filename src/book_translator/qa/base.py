@@ -74,6 +74,18 @@ class QAInterface(Protocol):
         """Avalia a fidelidade, precisão e naturalidade da tradução gerada."""
         ...
 
+    def validate(
+        self,
+        segment: Segment,
+        original_text: str | None = None,
+        translated_text: str | None = None,
+        context: Any = None,
+        glossary: list[Any] | None = None,
+        characters: list[Any] | None = None,
+    ) -> QAReport:
+        """Alias de conveniência para evaluate(), extraindo textos do segmento se omitidos."""
+        ...
+
 
 @dataclass
 class SemanticSignalScores:

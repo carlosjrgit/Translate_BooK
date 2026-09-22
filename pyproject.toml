@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "book-translator"
-version = "0.1.0"
+version = "1.0.1"
 description = "Translate Book CJrTools — Tradutor Editorial Inteligente de Livros EN -> PT-BR"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,12 +26,16 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "charset-normalizer>=3.0.0",
     "cryptography>=41.0.0",
+    "ctranslate2>=3.22.0",
+    "huggingface-hub>=0.19.0",
     "lxml>=4.9.0",
     "markdown-it-py>=3.0.0",
     "pillow>=10.0.0",
     "pypdf>=4.0.0",
     "PySide6>=6.5.0",
     "requests>=2.31.0",
+    "sentencepiece>=0.1.99",
+    "transformers>=4.35.0",
 ]
 
 [project.optional-dependencies]

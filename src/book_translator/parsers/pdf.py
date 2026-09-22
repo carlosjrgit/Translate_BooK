@@ -73,7 +73,7 @@ PAGE_NUMBER_REGEX = re.compile(
 PAGE_NUMBER_DASH_REGEX = re.compile(r"^\s*[-—–]\s*(\d+|[ivxlcdm]+)\s*[-—–]\s*$", re.IGNORECASE)
 
 CHAPTER_HEADING_REGEX = re.compile(
-    r"^\s*(?:CHAPTER|CAPÍTULO|ACT|SCENE|PART|PARTE|BOOK|LIVRO)\s+([0-9IVXLCDM]+|[A-ZÀ-ÿ\s]+)\s*$",
+    r"^\s*(?:CHAPTER|CAPÍTULO|ACT|SCENE|PART|PARTE|BOOK|LIVRO)\s+([0-9IVXLCDM]+[\.\:]?.*|[A-ZÀ-ÿ\s]+)\s*$",
     re.IGNORECASE,
 )
 
@@ -435,6 +435,39 @@ class PdfParser(BaseParser):
             metadata={"source_file_path": str(file_path)},
         )
 
+        pending_para_lines: list[str] = []
+        pending_line_num: int = 1
+        pending_page_num: int = 1
+        pending_ocr_meta: dict[str, Any] = {}
+
+        def flush_paragraph() -> None:
+            nonlocal reading_order, curr_chapter, pending_line_num, pending_page_num, pending_ocr_meta
+            if not pending_para_lines:
+                return
+            para_text = " ".join(pending_para_lines).strip()
+            pending_para_lines.clear()
+            if not para_text:
+                return
+
+            p_id = generate_paragraph_id(curr_chapter.id, len(curr_chapter.paragraphs) + 1)
+            curr_chapter.paragraphs.append(
+                Paragraph(
+                    id=p_id,
+                    chapter_id=curr_chapter.id,
+                    raw_text=para_text,
+                    normalized_text=para_text,
+                    order_index=len(curr_chapter.paragraphs) + 1,
+                    reading_order=reading_order,
+                    source_location=SourceLocation(
+                        file_path=str(file_path),
+                        page_number=pending_page_num,
+                        line_number=pending_line_num,
+                    ),
+                    metadata=dict(pending_ocr_meta),
+                )
+            )
+            reading_order += 1
+
         for p_idx, raw_lines in enumerate(cleaned_pages):
             page_num = p_idx + 1
             if not raw_lines:
@@ -468,36 +501,23 @@ class PdfParser(BaseParser):
             else:
                 lines = list(raw_lines)
 
-            pending_para_lines: list[str] = []
-            pending_line_num: int = 1
+            # Desifenização entre o fim da página anterior e o início da página atual
+            if self.config.fix_hyphenation and pending_para_lines and lines:
+                last_p_line = pending_para_lines[-1]
+                if re.search(r"[a-zA-ZÀ-ÿ]+[-\xad]\s*$", last_p_line):
+                    first_l = lines[0]
+                    m = re.match(r"^\s*([a-zà-ÿ]+)(.*)", first_l)
+                    if m:
+                        base_word = re.sub(r"[-\xad]\s*$", "", last_p_line)
+                        pending_para_lines[-1] = base_word + m.group(1)
+                        rest = m.group(2).strip()
+                        if rest:
+                            lines[0] = rest
+                        else:
+                            lines.pop(0)
 
-            def flush_paragraph() -> None:
-                nonlocal reading_order, curr_chapter
-                if not pending_para_lines:
-                    return
-                para_text = " ".join(pending_para_lines).strip()
-                pending_para_lines.clear()
-                if not para_text:
-                    return
-
-                p_id = generate_paragraph_id(curr_chapter.id, len(curr_chapter.paragraphs) + 1)
-                curr_chapter.paragraphs.append(
-                    Paragraph(
-                        id=p_id,
-                        chapter_id=curr_chapter.id,
-                        raw_text=para_text,
-                        normalized_text=para_text,
-                        order_index=len(curr_chapter.paragraphs) + 1,
-                        reading_order=reading_order,
-                        source_location=SourceLocation(
-                            file_path=str(file_path),
-                            page_number=page_num,
-                            line_number=pending_line_num,
-                        ),
-                        metadata=dict(page_ocr_meta),
-                    )
-                )
-                reading_order += 1
+            line_lens = [len(l.strip()) for l in lines if l.strip()]
+            max_line_len = max(line_lens) if line_lens else 80
 
             for line_idx, line in enumerate(lines):
                 line_str = line.strip()
@@ -510,7 +530,13 @@ class PdfParser(BaseParser):
                 if self.config.detect_headings:
                     if CHAPTER_HEADING_REGEX.match(line_str):
                         is_ch_heading = True
-                    elif len(line_str) < 50 and line_str.isupper() and len(line_str.split()) <= 6:
+                    elif (
+                        len(line_str) < 50
+                        and line_str.isupper()
+                        and len(line_str.split()) <= 6
+                        and not line_str.endswith(('"', "'", "”", "’", ",", ";", "-", "—"))
+                        and not (pending_para_lines and not re.search(r'[.?!:]["\'”’)]?$', pending_para_lines[-1].strip()))
+                    ):
                         is_ch_heading = True
 
                 if is_ch_heading:
@@ -556,6 +582,12 @@ class PdfParser(BaseParser):
 
                 # 2. Verifica se a linha é um Bloco de Diálogo
                 is_diag, marker, clean_text = self.identify_dialogue(line_str)
+                # Se estamos no meio de um parágrafo cuja oração não foi concluída,
+                # um travessão inicial é parentético/intrafrasal, e NÃO um novo diálogo.
+                if is_diag and marker in ("—", "–", "―", "-"):
+                    if pending_para_lines and not re.search(r'[.?!:]["\'”’)]?$', pending_para_lines[-1].strip()):
+                        is_diag = False
+
                 if is_diag:
                     flush_paragraph()
                     d_id = generate_dialogue_id(
@@ -580,15 +612,37 @@ class PdfParser(BaseParser):
                     reading_order += 1
                     continue
 
-
                 # 3. Linha de parágrafo comum
                 if not pending_para_lines:
+                    pending_page_num = page_num
                     pending_line_num = line_idx + 1
+                    pending_ocr_meta = dict(page_ocr_meta)
                 pending_para_lines.append(line_str)
 
-            flush_paragraph()
+                # Heurística de final de parágrafo para páginas sem linhas em branco
+                has_terminal = bool(re.search(r'[.?!]["\'”’)]?$', line_str))
+                if has_terminal and len(line_str) < max_line_len * 0.72:
+                    next_is_lower = False
+                    if line_idx + 1 < len(lines):
+                        next_str = lines[line_idx + 1].strip()
+                        if next_str and next_str[0].islower():
+                            next_is_lower = True
+                    if not next_is_lower:
+                        flush_paragraph()
+
+            # Fim da página: se terminar com pontuação terminal e for página curta ou linha curta
+            if pending_para_lines and lines:
+                last_l = pending_para_lines[-1].strip()
+                has_terminal = bool(re.search(r'[.?!]["\'”’)]?$', last_l))
+                if has_terminal:
+                    if len(lines) <= 3 or len(last_l) < max_line_len * 0.72:
+                        flush_paragraph()
+
+        flush_paragraph()
 
         if curr_chapter.paragraphs or curr_chapter.headings or curr_chapter.dialogue_blocks:
             chapters.append(curr_chapter)
 
         return chapters
+
+

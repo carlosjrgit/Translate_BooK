@@ -50,6 +50,9 @@ class PreprocessingConfig:
     # 7. Segmentação Inicial
     group_short_paragraphs: bool = True
     max_group_words: int = 120  # Agrupa parágrafos muito curtos contíguos até esse limite
+    split_long_paragraphs: bool = True
+    max_segment_words: int = 100  # Parágrafos longos (>100 palavras) são divididos em sentenças
     max_dialogue_exchange_words: int = 250  # Trocas rápidas de fala
     detect_small_scenes: bool = True
     max_scene_words: int = 350
+

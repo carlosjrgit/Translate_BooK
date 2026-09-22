@@ -41,6 +41,29 @@ class UnifiedQAOrchestrator:
         self.backtranslation_verifier = backtranslation_verifier or BacktranslationVerifier()
         self.db = db
 
+    def validate(
+        self,
+        segment: Segment,
+        original_text: str | None = None,
+        translated_text: str | None = None,
+        context: Any = None,
+        glossary: list[Any] | None = None,
+        characters: list[Any] | None = None,
+        fast_mode: bool = False,
+    ) -> UnifiedQAReport:
+        """Alias de conveniência para evaluate(), extraindo textos do segmento se omitidos."""
+        src = original_text if original_text is not None else segment.original_text
+        tgt = translated_text if translated_text is not None else (segment.translated_text or "")
+        return self.evaluate(
+            segment=segment,
+            original_text=src,
+            translated_text=tgt,
+            context=context,
+            glossary=glossary,
+            characters=characters,
+            fast_mode=fast_mode,
+        )
+
     def evaluate(
         self,
         segment: Segment,
