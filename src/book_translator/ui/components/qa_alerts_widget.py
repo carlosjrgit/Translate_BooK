@@ -74,6 +74,7 @@ class QAAlertsWidget(QWidget):
         self.tbl_alerts.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.tbl_alerts.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tbl_alerts.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tbl_alerts.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.tbl_alerts.setAlternatingRowColors(True)
         self.tbl_alerts.itemDoubleClicked.connect(self._on_item_double_clicked)
 
