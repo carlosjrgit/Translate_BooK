@@ -271,7 +271,14 @@ def test_translate_segment_uses_correct_api():
 
 def test_worker_qa_execution(tmp_path):
     """Garante que o worker executa a etapa de QA sem erro de API ('validate' / 'evaluate')."""
-    from book_translator.core.models import Chapter, Document, Project, ProjectMetadata, Segment, SegmentStatus
+    from book_translator.core.models import (
+        Chapter,
+        Document,
+        Project,
+        ProjectMetadata,
+        Segment,
+        SegmentStatus,
+    )
     from book_translator.database import SQLiteDatabase
     from book_translator.ui.worker import PipelineWorker
 

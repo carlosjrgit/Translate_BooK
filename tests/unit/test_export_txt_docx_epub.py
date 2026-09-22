@@ -218,8 +218,15 @@ def test_export_manager_all_formats(sample_document: Document, tmp_path: Path):
 
 def test_export_stitching_split_paragraphs(tmp_path: Path):
     """Garante que segmentos fracionados do mesmo parágrafo sejam remontados (stitched) na exportação."""
-    from book_translator.core.models import Chapter, Document, DocumentMetadata, Segment, SegmentStatus
     import zipfile
+
+    from book_translator.core.models import (
+        Chapter,
+        Document,
+        DocumentMetadata,
+        Segment,
+        SegmentStatus,
+    )
 
     original_file = tmp_path / "original_stitch.txt"
     original_file.write_text("dummy original content", encoding="utf-8")

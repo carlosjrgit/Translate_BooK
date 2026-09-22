@@ -16,7 +16,6 @@ from book_translator.export.manager import ExportManager
 from book_translator.logging import get_logger
 from book_translator.memory.style_bible import StyleBible
 from book_translator.qa.deterministic import DeterministicQAEngine
-
 from book_translator.translation.pipeline import (
     CancellationToken,
     TranslationPipeline,

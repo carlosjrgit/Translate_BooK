@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-
 from book_translator.core.models import Document
 from book_translator.database.sqlite import SQLiteDatabase
 from book_translator.logging import get_logger

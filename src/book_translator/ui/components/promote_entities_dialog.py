@@ -23,15 +23,12 @@ from book_translator.memory.models import GlossaryEntry
 from book_translator.ui.theme import (
     COLOR_ACCENT,
     COLOR_BORDER_SUBTLE,
-    COLOR_SUCCESS,
-    COLOR_SURFACE,
     COLOR_SURFACE_ELEVATED,
     COLOR_TEXT_PRIMARY,
     COLOR_TEXT_SECONDARY,
     FONT_PRIMARY,
     RADIUS_DEFAULT,
 )
-
 
 
 class PromoteEntitiesDialog(QDialog):

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict
 from enum import Enum
-import re
 from typing import Any
-
 
 from book_translator.core.ids import compute_content_hash, generate_segment_id
 from book_translator.core.models import (

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -27,11 +26,9 @@ from book_translator.ui.theme import (
     COLOR_TEXT_PRIMARY,
     COLOR_TEXT_SECONDARY,
     COLOR_WARNING,
-    FONT_MONOSPACE,
     FONT_PRIMARY,
     RADIUS_DEFAULT,
 )
-
 
 
 class SegmentEditDialog(QDialog):

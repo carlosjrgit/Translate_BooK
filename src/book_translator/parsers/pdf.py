@@ -516,7 +516,7 @@ class PdfParser(BaseParser):
                         else:
                             lines.pop(0)
 
-            line_lens = [len(l.strip()) for l in lines if l.strip()]
+            line_lens = [len(line_item.strip()) for line_item in lines if line_item.strip()]
             max_line_len = max(line_lens) if line_lens else 80
 
             for line_idx, line in enumerate(lines):

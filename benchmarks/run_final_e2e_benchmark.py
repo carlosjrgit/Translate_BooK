@@ -13,7 +13,6 @@ Métricas aferidas:
 
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 import time
@@ -26,12 +25,12 @@ WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 if str(WORKSPACE_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT / "src"))
 
-from book_translator.core.document import Chapter, Document, DocumentMetadata, Paragraph
+from book_translator.core.document import Chapter, Document
 from book_translator.core.models import Project, ProjectMetadata, Segment
 from book_translator.database.sqlite import SQLiteDatabase
 from book_translator.export.manager import ExportManager
 from book_translator.memory.base import GlossaryEntry
-from book_translator.qa import DeterministicQAEngine, UnifiedQAOrchestrator
+from book_translator.qa import DeterministicQAEngine
 from book_translator.system.hardware import HardwareProfiler
 from book_translator.translation.madlad import (
     DeviceType,
